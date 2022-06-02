@@ -5,6 +5,7 @@
 import flask
 import flask_limiter
 import flask_limiter.util
+import app.plugin.microservice_support as ms_support
 
 
 def init_app(app: flask.Flask):
@@ -23,6 +24,8 @@ def init_app(app: flask.Flask):
         key_func=flask_limiter.util.get_remote_address,
         default_limits=['3 per second'],
         storage_uri=limiter_storage_url)
+
+    runable_app = ms_support.init_app(runable_app)
 
     # init_app must return app
     return runable_app

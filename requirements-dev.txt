@@ -22,6 +22,7 @@ flask-cors
 flask-sqlalchemy
 flask-admin
 flask-limiter[redis]
+flask-socketio
 
 gunicorn
 
