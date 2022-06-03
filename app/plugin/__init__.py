@@ -22,7 +22,7 @@ def init_app(app: flask.Flask):
     limiter = flask_limiter.Limiter(  # noqa: F841
         runable_app,
         key_func=flask_limiter.util.get_remote_address,
-        default_limits=['3 per second'],
+        default_limits=['10 per second'],
         storage_uri=limiter_storage_url)
 
     runable_app = ms_support.init_app(runable_app)
