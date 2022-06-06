@@ -2,8 +2,10 @@
 > 이 프로젝트는 [MU-Software/frost](https://github.com/MU-software/frost)에 기반하고 있습니다. 관심이 있으시다면 한번 확인해보세요!   
 > 더 적은 코드로 RESTful한 API를 작성하고, 문서 자동화를 경험하실 수 있어요!  
 
-> 영어 버전의 README가 [여기](README.md)에 있어요!  
+> [여기](README.md)에 영어 버전의 README가 있어요!  
 > [Click here](README.md) to read a README written in English.  
+
+> [여기](https://github.com/MU-Software/mudev_frontend)를 눌러 프론트엔드 저장소로 가실 수 있어요!  
 
 이 곳은 [MUdev.cc](https://mudev.cc)와 하위 서비스인 [PlayCo](https://mudev.cc/playco)의 API 서버에 대한 코드 저장소입니다.  
 
