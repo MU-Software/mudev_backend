@@ -55,7 +55,7 @@ repos:
           - tokenize-rt==3.2.0
           - types-redis
           - types-PyYAML
-          - SQLAlchemy-stubs
+          - types-toml
 -   repo: https://github.com/dosisod/refurb
     rev: v1.22.1
     hooks:
