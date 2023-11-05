@@ -26,7 +26,7 @@ def build_docker_cmd(
     use_local_image_if_possible: bool = True,
 ) -> list[str]:
     docker_cmd = ["docker", "run", "-it", "--rm"]
-    docker_env = list(itertools.chain.from_iterable([["--env", f"{k}={v}"] for k, v in env.items() if v]))
+    docker_env = list(itertools.chain.from_iterable(["--env", f"{k}={v}"] for k, v in env.items() if v))
 
     if use_local_image_if_possible and (local_repo_img := get_local_image_list(repository)):
         docker_img = [local_repo_img[0]["ID"]]
