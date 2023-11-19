@@ -1,2 +1,6 @@
-class OpenAPITag:
-    HEALTH_CHECK = "Health Check"
+import enum
+
+
+class OpenAPITag(enum.StrEnum):
+    HEALTH_CHECK = enum.auto()
+    USER = enum.auto()

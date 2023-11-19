@@ -10,7 +10,7 @@ import app.db as db_module
 import app.redis as redis_module
 
 logger = logging.getLogger(__name__)
-health_check_router = fastapi.APIRouter()
+router = fastapi.APIRouter()
 
 
 class HealthCheckResponse(pydantic.BaseModel):
@@ -22,17 +22,17 @@ class ReadyzResponse(HealthCheckResponse):
     cache: bool
 
 
-@health_check_router.get("/healthz", tags=[tag_const.OpenAPITag.HEALTH_CHECK], response_model=HealthCheckResponse)
+@router.get("/healthz", tags=[tag_const.OpenAPITag.HEALTH_CHECK], response_model=HealthCheckResponse)
 async def healthz():
     return fastapi.responses.JSONResponse(content={"message": "ok"})
 
 
-@health_check_router.get("/livez", tags=[tag_const.OpenAPITag.HEALTH_CHECK], response_model=HealthCheckResponse)
+@router.get("/livez", tags=[tag_const.OpenAPITag.HEALTH_CHECK], response_model=HealthCheckResponse)
 async def livez():
     return fastapi.responses.JSONResponse(content={"message": "ok"})
 
 
-@health_check_router.get("/readyz", tags=[tag_const.OpenAPITag.HEALTH_CHECK], response_model=ReadyzResponse)
+@router.get("/readyz", tags=[tag_const.OpenAPITag.HEALTH_CHECK], response_model=ReadyzResponse)
 async def readyz(db_session: db_module.dbDI, redis_session: redis_module.redisDI):
     response = {"message": "ok", "database": False, "cache": False}
     try:
