@@ -3,8 +3,18 @@ from __future__ import annotations
 import contextlib
 import email.utils
 import enum
+import functools
 import string
+import typing
 import unicodedata
+
+import pydantic
+
+USERNAME_MIN_LEN = 4
+USERNAME_MAX_LEN = 48
+PW_MIN_LEN = 8
+PW_MAX_LEN = 1024
+PW_MIN_CHAR_TYPE_NUM = 2
 
 # ---------- Check and Normalize strings ----------
 char_printable: str = string.ascii_letters + string.digits + string.punctuation
@@ -71,20 +81,47 @@ class UserNameValidator(enum.StrEnum):
     TOO_LONG = enum.auto()
     FORBIDDEN_CHAR = enum.auto()
 
-    WRONG_PASSWORD = enum.auto()
-    UNKNOWN_ERROR = enum.auto()
-
     @classmethod
-    def is_valid(cls, s: str) -> UserNameValidator:
-        if 4 > len(s):
+    def is_valid(cls, s: str, min_len: int, max_len: int) -> UserNameValidator:
+        if not s:
+            return cls.EMPTY
+        if min_len > len(s):
             return cls.TOO_SHORT
-        if len(s) > 48:
+        if len(s) > max_len:
             return cls.TOO_LONG
 
         if not is_urlsafe(s):
             return cls.FORBIDDEN_CHAR
 
         return cls.SAFE
+
+    @classmethod
+    def validate_username(cls, value: str, min_len: int, max_len: int) -> str:
+        match cls.is_valid(value, min_len=min_len, max_len=max_len):
+            case cls.SAFE:
+                return value
+            case cls.EMPTY:
+                raise ValueError("ID를 입력해주세요!")
+            case cls.TOO_SHORT:
+                raise ValueError(f"ID가 너무 짧아요! (최소 {min_len}자 이상으로 설정해주세요)")
+            case cls.TOO_LONG:
+                raise ValueError(f"ID가 너무 길어요! (최대 {max_len}까지 가능해요)")
+            case cls.FORBIDDEN_CHAR:
+                raise ValueError("ID에 사용할 수 없는 문자가 있어요!")
+            case _:
+                raise ValueError("알 수 없는 오류가 발생했어요! 관리자에게 문의해주세요!")
+
+
+UsernameField = typing.Annotated[
+    str,
+    pydantic.functional_validators.BeforeValidator(
+        functools.partial(
+            UserNameValidator.validate_username,
+            min_len=USERNAME_MIN_LEN,
+            max_len=USERNAME_MAX_LEN,
+        ),
+    ),
+]
 
 
 class PasswordValidator(enum.StrEnum):
@@ -103,7 +140,9 @@ class PasswordValidator(enum.StrEnum):
     UNKNOWN_ERROR = enum.auto()
 
     @classmethod
-    def is_valid(cls, s: str, min_char_type_num: int = 2, min_len: int = 8, max_len: int = 1024) -> PasswordValidator:
+    def is_valid(cls, s: str, min_char_type_num: int, min_len: int, max_len: int) -> PasswordValidator:
+        if not s:
+            return cls.EMPTY
         if len(s) < min_len:
             return cls.TOO_SHORT
         if max_len < len(s):
@@ -117,3 +156,37 @@ class PasswordValidator(enum.StrEnum):
             return cls.FORBIDDEN_CHAR
 
         return cls.SAFE
+
+    @classmethod
+    def validate_password(cls, value: str, min_len: int, max_len: int, min_char_type_num: int) -> str:
+        match cls.is_valid(value, min_len=min_len, max_len=max_len, min_char_type_num=min_char_type_num):
+            case cls.SAFE:
+                return value
+            case cls.EMPTY:
+                raise ValueError("비밀번호를 입력해주세요!")
+            case cls.TOO_SHORT:
+                raise ValueError(f"비밀번호가 너무 짧아요! (최소 {min_len}자 이상으로 설정해주세요)")
+            case cls.TOO_LONG:
+                raise ValueError("비밀번호가 너무 길어요!\n" f"(최대 {max_len}자까지 가능해요...이렇게 긴 비밀번호는 외우기 힘드시지 않을까요?)")
+            case cls.NEED_MORE_CHAR_TYPE:
+                raise ValueError(
+                    f"비밀번호에는 {min_char_type_num}가지 이상의 문자 종류가 포함되어야 해요!\n"
+                    f"(영문 대문자, 영문 소문자, 숫자, 특수문자 중 {min_char_type_num}가지 이상을 포함해주세요)"
+                )
+            case cls.FORBIDDEN_CHAR:
+                raise ValueError("비밀번호에 사용할 수 없는 문자가 있어요!")
+            case _:
+                raise ValueError("알 수 없는 오류가 발생했어요! 관리자에게 문의해주세요!")
+
+
+PasswordField = typing.Annotated[
+    str,
+    pydantic.functional_validators.BeforeValidator(
+        functools.partial(
+            PasswordValidator.validate_password,
+            min_len=PW_MIN_LEN,
+            max_len=PW_MAX_LEN,
+            min_char_type_num=PW_MIN_CHAR_TYPE_NUM,
+        ),
+    ),
+]
