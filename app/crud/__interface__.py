@@ -159,14 +159,29 @@ class CRUDBase(typing.Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         return db_obj
 
     @typing.overload
-    def remove(self, session: db_types.SessionType, *, uuid: str | uuid.UUID) -> ModelsType:
+    def delete(self, session: db_types.SessionType, *, uuid: str | uuid.UUID) -> ModelsType:
         ...
 
     @typing.overload
-    def remove(  # type: ignore[misc]
+    def delete(  # type: ignore[misc]
         self, session: db_types.AsyncSessionType, *, uuid: str | uuid.UUID
     ) -> AwaitableModelsType:
         ...
 
-    async def remove(self, session: db_types.PossibleSessionType, *, uuid: str | uuid.UUID) -> PossibleModelsType:
+    async def delete(self, session: db_types.PossibleSessionType, *, uuid: str | uuid.UUID) -> PossibleModelsType:
+        return session.execute(
+            sa.update(self.model).where(self.model.uuid == uuid).values(deleted_at=sa.func.now()).returning(self.model)
+        )
+
+    @typing.overload
+    def hard_delete(self, session: db_types.SessionType, *, uuid: str | uuid.UUID) -> ModelsType:
+        ...
+
+    @typing.overload
+    def hard_delete(  # type: ignore[misc]
+        self, session: db_types.AsyncSessionType, *, uuid: str | uuid.UUID
+    ) -> AwaitableModelsType:
+        ...
+
+    async def hard_delete(self, session: db_types.PossibleSessionType, *, uuid: str | uuid.UUID) -> PossibleModelsType:
         return session.execute(sa.delete(self.model).where(self.model.uuid == uuid).returning(self.model))
