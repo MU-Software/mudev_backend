@@ -38,6 +38,7 @@ toml = "^0.10.2"
 email-validator = "^2.1.0.post1"
 pyjwt = "^2.8.0"
 user-agents = "^2.2.0"
+typing-extensions = "^4.8.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.4.0"
