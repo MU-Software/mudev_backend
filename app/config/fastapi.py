@@ -122,6 +122,15 @@ class FastAPISetting(pydantic_settings.BaseSettings):
             "reload": self.debug,
         }
 
+    def to_cookie_config(self) -> dict:
+        # See app.util.fastapi.cookie.Cookie class for more details
+        return {
+            "domain": self.server_name if self.debug else None,
+            "secure": self.security.https_enabled,
+            "httponly": True,
+            "samesite": ("None" if self.security.https_enabled else "Lax") if self.debug else "strict",
+        }
+
 
 @functools.lru_cache(maxsize=1)
 def get_fastapi_setting() -> FastAPISetting:
