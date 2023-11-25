@@ -6,11 +6,11 @@ import pydantic
 import sqlalchemy as sa
 
 import app.const.tag as tag_const
-import app.db as db_module
-import app.redis as redis_module
+import app.dependency.common as common_dep
+import app.dependency.header as header_dep
 
 logger = logging.getLogger(__name__)
-router = fastapi.APIRouter()
+router = fastapi.APIRouter(tags=[tag_const.OpenAPITag.HEALTH_CHECK])
 
 
 class HealthCheckResponse(pydantic.BaseModel):
@@ -22,19 +22,24 @@ class ReadyzResponse(HealthCheckResponse):
     cache: bool
 
 
-@router.get("/healthz", tags=[tag_const.OpenAPITag.HEALTH_CHECK], response_model=HealthCheckResponse)
-async def healthz():
-    return fastapi.responses.JSONResponse(content={"message": "ok"})
+class AccessInfoResponse(HealthCheckResponse):
+    user_agent: str
+    user_ip: str
 
 
-@router.get("/livez", tags=[tag_const.OpenAPITag.HEALTH_CHECK], response_model=HealthCheckResponse)
-async def livez():
-    return fastapi.responses.JSONResponse(content={"message": "ok"})
+@router.get("/healthz", response_model=HealthCheckResponse)
+async def healthz() -> dict[str, str]:
+    return {"message": "ok"}
 
 
-@router.get("/readyz", tags=[tag_const.OpenAPITag.HEALTH_CHECK], response_model=ReadyzResponse)
-async def readyz(db_session: db_module.dbDI, redis_session: redis_module.redisDI):
-    response = {"message": "ok", "database": False, "cache": False}
+@router.get("/livez", response_model=HealthCheckResponse)
+async def livez() -> dict[str, str]:
+    return {"message": "ok"}
+
+
+@router.get("/readyz", response_model=ReadyzResponse)
+async def readyz(db_session: common_dep.dbDI, redis_session: common_dep.redisDI) -> dict[str, str | bool]:
+    response: dict[str, str | bool] = {"message": "ok", "database": False, "cache": False}
     try:
         await db_session.execute(sa.text("SELECT 1"))
         response["database"] = True
@@ -46,4 +51,12 @@ async def readyz(db_session: db_module.dbDI, redis_session: redis_module.redisDI
         response["cache"] = True
     except Exception:
         logger.exception("Redis connection failed")
-    return fastapi.responses.JSONResponse(content=response)
+    return response
+
+
+@router.get("/access_info", response_model=AccessInfoResponse)
+async def access_info(
+    user_ip: header_dep.user_ip = None,
+    user_agent: header_dep.user_agent = None,
+) -> dict[str, str | None]:
+    return {"user_agent": user_agent, "user_ip": user_ip}

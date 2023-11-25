@@ -1,4 +1,3 @@
-import datetime
 import secrets
 
 import sqlalchemy as sa
@@ -29,7 +28,7 @@ class DefaultModelMixin(sa_orm.DeclarativeBase):
 
     uuid: sa_orm.Mapped[db_types.PrimaryKeyType]
 
-    created_at: sa_orm.Mapped[datetime.datetime] = sa_orm.mapped_column(default=sa.func.now())
-    modified_at: sa_orm.Mapped[datetime.datetime] = sa_orm.mapped_column(default=sa.func.now(), onupdate=sa.func.now())
-    deleted_at: sa_orm.Mapped[datetime.datetime | None] = sa_orm.mapped_column(default=None)
+    created_at: sa_orm.Mapped[db_types.DateTime] = sa_orm.mapped_column(default=sa.func.now())
+    modified_at: sa_orm.Mapped[db_types.DateTime] = sa_orm.mapped_column(default=sa.func.now(), onupdate=sa.func.now())
+    deleted_at: sa_orm.Mapped[db_types.DateTime_Nullable]
     commit_id: sa_orm.Mapped[str] = sa_orm.mapped_column(default=secrets.token_hex, onupdate=secrets.token_hex)

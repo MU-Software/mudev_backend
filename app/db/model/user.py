@@ -40,14 +40,14 @@ class User(db_mixin.DefaultModelMixin):
 
     # No, We won't support multiple email account
     email: sa_orm.Mapped[db_types.Str_Unique]
-    email_verified: sa_orm.Mapped[db_types.Bool_DFalse]
+    email_verified_at: sa_orm.Mapped[db_types.DateTime_Nullable]
     email_secret: sa_orm.Mapped[db_types.Str_Nullable]
 
-    last_signin_at: sa_orm.Mapped[datetime.datetime | None]
+    last_signin_at: sa_orm.Mapped[db_types.DateTime_Nullable]
     signin_fail_count: sa_orm.Mapped[int] = sa_orm.mapped_column(default=0)
-    signin_failed_at: sa_orm.Mapped[datetime.datetime | None]
+    signin_failed_at: sa_orm.Mapped[db_types.DateTime_Nullable]
 
-    locked_at: sa_orm.Mapped[datetime.datetime | None]
+    locked_at: sa_orm.Mapped[db_types.DateTime_Nullable]
     locked_by_uuid: sa_orm.Mapped[db_types.UserFK_Nullable]
     locked_reason: sa_orm.Mapped[db_types.Str_Nullable]
 
@@ -58,7 +58,7 @@ class User(db_mixin.DefaultModelMixin):
     profile_image: sa_orm.Mapped[db_types.Str_Nullable]  # This will point to user profile image url
     website: sa_orm.Mapped[db_types.Str_Nullable]
     location: sa_orm.Mapped[db_types.Str_Nullable]
-    birth: sa_orm.Mapped[datetime.date | None]
+    birth: sa_orm.Mapped[db_types.Date_Nullable]
 
     def to_dict(self) -> dict[str, typing.Any]:
         return {
@@ -68,7 +68,7 @@ class User(db_mixin.DefaultModelMixin):
 
     @property
     def signin_disabled_reason(self) -> SignInDisabledReason | None:
-        if SIGNIN_POSSIBLE_AFTER_MAIL_VERIFICATION and not self.email_verified:
+        if SIGNIN_POSSIBLE_AFTER_MAIL_VERIFICATION and not self.email_verified_at:
             return SignInDisabledReason.EMAIL_NOT_VERIFIED
 
         elif self.deleted_at:
@@ -115,5 +115,11 @@ class User(db_mixin.DefaultModelMixin):
 
 class UserSignInHistory(db_mixin.DefaultModelMixin):
     user_uuid: sa_orm.Mapped[db_types.UserFK]
+
     ip: sa_orm.Mapped[db_types.Str]
     user_agent: sa_orm.Mapped[db_types.Str]
+
+    expires_at: sa_orm.Mapped[datetime.datetime]
+    next_uuid: sa_orm.Mapped[db_types.PrimaryKeyType] = sa_orm.mapped_column(
+        sa.ForeignKey("UserSignInHistory.uuid"), nullable=True
+    )

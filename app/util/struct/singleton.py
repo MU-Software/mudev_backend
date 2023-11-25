@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 
 
@@ -9,9 +11,9 @@ class Singleton(type):
             pass
     """
 
-    _instances: dict[str, typing.Type["Singleton"]] = {}
+    _instances: dict[str, typing.Type[Singleton]] = {}
 
-    def __call__(cls, *args, **kwargs):
+    def __call__(cls, *args: tuple, **kwargs: dict) -> typing.Type[Singleton]:
         if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
+            cls._instances[cls.__name__] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls.__name__]

@@ -2,9 +2,10 @@ import typing
 
 import sqlalchemy as sql
 import sqlalchemy.ext.declarative as sqldec
+import sqlalchemy.orm as sqlorm
 
 
-def get_model_changes(model) -> dict[str, list[typing.Any]]:
+def get_model_changes(model: sqlorm.DeclarativeBase) -> dict[str, list[typing.Any]]:
     """
     Return a dictionary containing changes made to the model since it was
     fetched from the database.
@@ -38,7 +39,7 @@ def get_model_changes(model) -> dict[str, list[typing.Any]]:
     return changes
 
 
-def has_model_changed(model) -> bool:
+def has_model_changed(model: sqlorm.DeclarativeBase) -> bool:
     """
     Return True if there are any unsaved changes on the model.
     """
@@ -52,7 +53,7 @@ def create_dynamic_orm_table(
     table_name: str,
     columns: typing.Optional[dict[str, typing.Any]] = None,
     mixins: tuple = (),
-):
+) -> type[sqlorm.DeclarativeMeta]:
     table_attrs: dict = {
         "__tablename__": table_name,
         "__table_args__": {

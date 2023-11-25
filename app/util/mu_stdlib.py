@@ -11,7 +11,7 @@ safe_int: typing.Callable[[typing.Any], int] = mu_exception.ignore_exception(Exc
 safe_json_loads: typing.Callable[[typing.Any], dict | None] = mu_exception.ignore_exception(Exception, None)(json.loads)
 
 
-def isiterable(a) -> bool:
+def isiterable(a: typing.Any) -> bool:
     with contextlib.suppress(TypeError):
         return iter(a) is not None
     return False

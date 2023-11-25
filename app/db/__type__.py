@@ -1,3 +1,4 @@
+import datetime
 import pathlib as pt
 import uuid
 
@@ -22,6 +23,13 @@ Str = tx.Annotated[str, sa_orm.mapped_column(nullable=False)]
 Str_Unique = tx.Annotated[str, sa_orm.mapped_column(nullable=False, unique=True, index=True)]
 Str_Nullable = tx.Annotated[str | None, sa_orm.mapped_column(nullable=True)]
 
+DateTime = tx.Annotated[datetime.datetime, sa_orm.mapped_column(sa.DateTime(timezone=True), nullable=False)]
+DateTime_Nullable = tx.Annotated[
+    datetime.datetime | None, sa_orm.mapped_column(sa.DateTime(timezone=True), nullable=True)
+]
+Date = tx.Annotated[datetime.date, sa_orm.mapped_column(sa.Date, nullable=False)]
+Date_Nullable = tx.Annotated[datetime.date | None, sa_orm.mapped_column(sa.Date, nullable=True)]
+
 UserFK = tx.Annotated[PrimaryKeyType, sa_orm.mapped_column(sa.ForeignKey("user.uuid"), nullable=False, index=True)]
 UserFK_Nullable = tx.Annotated[PrimaryKeyType | None, sa_orm.mapped_column(sa.ForeignKey("user.uuid"), nullable=True)]
 FileFK = tx.Annotated[PrimaryKeyType, sa_orm.mapped_column(sa.ForeignKey("file.uuid"), nullable=False)]
@@ -35,8 +43,8 @@ class PathType(sa.types.TypeDecorator):
     impl = sa.types.String
     cache_ok = True
 
-    def process_bind_param(self, pathlib_path: pt.Path, dialect) -> str:
+    def process_bind_param(self, pathlib_path: pt.Path, dialect: sa.Dialect) -> str:
         return pathlib_path.absolute().as_posix()
 
-    def process_result_value(self, path_str: str | None, dialect) -> pt.Path | None:
+    def process_result_value(self, path_str: str | None, dialect: sa.Dialect) -> pt.Path | None:
         return pt.Path(path_str) if path_str else None

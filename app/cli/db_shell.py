@@ -10,7 +10,7 @@ import app.util.network as network_util
 config_obj = fastapi_config.get_fastapi_setting()
 
 
-def db_shell(use_docker: bool = True):
+def db_shell(use_docker: bool = True) -> None:
     environ: dict[str, str] = {
         "TZ": "Asia/Seoul",
         "PGPASSWORD": config_obj.sqlalchemy.connection.password,

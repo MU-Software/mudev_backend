@@ -1,5 +1,6 @@
 import datetime
 import typing
+import uuid
 
 import argon2
 import pydantic
@@ -12,7 +13,8 @@ import app.util.pydantic.normalizer as normalizer
 import app.util.pydantic.with_model as with_model
 
 
-class UserResponse(pydantic.BaseModel):
+class UserDTO(pydantic.BaseModel):
+    uuid: uuid.UUID
     username: mu_string.UsernameField
     nickname: str
     email: pydantic.EmailStr
@@ -64,19 +66,6 @@ class UserCreate(normalizer.NormalizerModelMixin):  # A.k.a. Sign Up
     def serialize_password(self, v: str) -> str:
         """DB에 비밀번호의 해시를 저장하도록 합니다."""
         return argon2.PasswordHasher().hash(v)
-
-
-class UserSignIn(normalizer.NormalizerModelMixin):
-    user_ident: mu_string.UsernameField | pydantic.EmailStr | str
-    password: str
-
-    @property
-    def signin_type(self) -> tuple[sa.ColumnElement, str]:
-        if self.user_ident.startswith("@"):
-            return user_model.User.username, self.user_ident[1:]
-        elif "@" in self.user_ident and mu_string.is_email(self.user_ident):
-            return user_model.User.email, self.user_ident
-        return user_model.User.username, self.user_ident
 
 
 class UserUpdate(normalizer.NormalizerModelMixin, with_model.WithSAModelMixin[user_model.User]):
@@ -133,3 +122,16 @@ class UserPasswordUpdateForModel(UserPasswordUpdate, with_model.WithSAModelMixin
             raise ValueError("비밀번호가 ID, 이메일, 또는 닉네임과 너무 비슷해요! 다른 비밀번호를 입력해주세요!")
 
         return self
+
+
+class UserSignIn(normalizer.NormalizerModelMixin):
+    user_ident: mu_string.UsernameField | pydantic.EmailStr | str
+    password: str
+
+    @property
+    def signin_type(self) -> tuple[sa.ColumnElement, str]:
+        if self.user_ident.startswith("@"):
+            return user_model.User.username, self.user_ident[1:]
+        elif "@" in self.user_ident and mu_string.is_email(self.user_ident):
+            return user_model.User.email, self.user_ident
+        return user_model.User.username, self.user_ident

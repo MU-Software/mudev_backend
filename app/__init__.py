@@ -24,7 +24,7 @@ async def on_app_shutdown() -> None:
     await redis_module.close_redis_connection()
 
 
-def create_app(**kwargs) -> fastapi.FastAPI:
+def create_app(**kwargs: dict) -> fastapi.FastAPI:
     app = fastapi.FastAPI(
         **kwargs,
         **fastapi_config_obj.to_fastapi_config(),

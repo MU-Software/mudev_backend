@@ -3,8 +3,10 @@ from __future__ import annotations
 import contextlib
 import enum
 import logging
+import typing
 import uuid
 
+import billiard.einfo
 import celery
 import celery.result
 import redis
@@ -18,6 +20,7 @@ import app.db.model.task as task_model
 
 logger = logging.getLogger(__name__)
 config_obj = celery_config.get_celery_setting()
+T = typing.TypeVar("T")
 
 
 class CeleryTaskStatus(enum.StrEnum):
@@ -29,7 +32,7 @@ class CeleryTaskStatus(enum.StrEnum):
     REVOKED = enum.auto()
 
 
-class SessionTask(celery.Task):
+class SessionTask(celery.Task, typing.Generic[T]):
     task_id: str
 
     redis_client: redis.Redis
@@ -41,7 +44,7 @@ class SessionTask(celery.Task):
 
     _task_instance: task_model.Task | None = None
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: tuple, **kwargs: dict) -> None:
         super().__init__(*args, **kwargs)
 
         self.redis_client = redis.Redis.from_url(config_obj.redis.uri)
@@ -96,25 +99,35 @@ class SessionTask(celery.Task):
         self.db_session.refresh(self._task_instance)
         return self._task_instance
 
-    def on_failure(self, exc, task_id, args, kwargs, einfo) -> None:
+    def run(self, *args: tuple, **kwargs: dict) -> T:
+        logger.info(f"Task[{self.task_id}] run called")
+        return super().run(*args, **kwargs)
+
+    def on_failure(
+        self, exc: Exception, task_id: str, args: tuple, kwargs: dict, einfo: billiard.einfo.ExceptionInfo
+    ) -> None:
         logger.info(f"Task[{task_id}] on_failure called")
         self._invalidate_session()
         return super().on_failure(exc, self.task_id, args, kwargs, einfo)
 
-    def on_retry(self, exc, task_id, args, kwargs, einfo) -> None:
+    def on_retry(
+        self, exc: Exception, task_id: str, args: tuple, kwargs: dict, einfo: billiard.einfo.ExceptionInfo
+    ) -> None:
         logger.info(f"Task[{task_id}] on_retry called")
         self._invalidate_session()
         return super().on_retry(exc, self.task_id, args, kwargs, einfo)
 
-    def on_success(self, retval, task_id, args, kwargs) -> None:
+    def on_success(self, retval: T, task_id: str, args: tuple, kwargs: dict) -> None:
         logger.info(f"Task[{task_id}] on_success called")
         return super().on_success(retval, self.task_id, args, kwargs)
 
-    def before_start(self, task_id, args, kwargs) -> None:
+    def before_start(self, task_id: str, args: tuple, kwargs: dict) -> None:
         logger.info(f"Task[{task_id}] before_start called")
         return super().before_start(self.task_id, args, kwargs)
 
-    def after_return(self, status, retval, task_id, args, kwargs, einfo) -> None:
+    def after_return(
+        self, status: str, retval: T, task_id: str, args: tuple, kwargs: dict, einfo: billiard.einfo.ExceptionInfo
+    ) -> None:
         logger.info(f"Task[{task_id}] after_return called: {status} (retval: {retval}, einfo: {einfo})")
         self._invalidate_session()
         self.db_engine.dispose()
@@ -125,7 +138,7 @@ class SessionTask(celery.Task):
         task_id: str | None = None,
         state: CeleryTaskStatus | None = None,
         meta: dict | None = None,
-        **kwargs,
+        **kwargs: dict,
     ) -> None:
         logger.info(f"Task[{task_id}] state updated: {state} (meta: {meta})")
 
@@ -134,5 +147,5 @@ class SessionTask(celery.Task):
             self.db_session.commit()
         return super().update_state(task_id=task_id, state=state, meta=meta, **kwargs)
 
-    def apply_async(self, *args, **kwargs) -> celery.result.AsyncResult:
+    def apply_async(self, *args: tuple, **kwargs: dict) -> celery.result.AsyncResult:
         return super().apply_async(task_id=self.task_id, *args, **kwargs)

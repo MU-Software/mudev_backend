@@ -50,7 +50,13 @@ repos:
     rev: 'v1.7.0'
     hooks:
       - id: mypy
-        args: [--no-strict-optional, --ignore-missing-imports]
+        args:
+          - --no-strict-optional
+          - --ignore-missing-imports
+          - --check-untyped-defs
+          - --disallow-untyped-defs
+          - --disallow-incomplete-defs
+          - --disallow-untyped-calls
         additional_dependencies:
           - tokenize-rt==3.2.0
           - types-redis

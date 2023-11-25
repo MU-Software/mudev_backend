@@ -84,7 +84,7 @@ async def download_video(
 
 @celery.shared_task(bind=True, base=celery_interface.SessionTask)
 def ytdl_downloader_task(
-    self: celery_interface.SessionTask,
+    self: celery_interface.SessionTask[None],
     youtube_vid: str,
     target_path_str: str,
     user_uuid: uuid.UUID,

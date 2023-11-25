@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery.shared_task(bind=True, base=celery_interface.SessionTask)
-def ytdl_updater_task(self: celery_interface.SessionTask) -> None:
+def ytdl_updater_task(self: celery_interface.SessionTask[None]) -> None:
     stmt = sa.select(sa.exists(task_model.Task)).where(
         task_model.Task.celery_task_name == self.name,
         task_model.Task.startable.is_(True),

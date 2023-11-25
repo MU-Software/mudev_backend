@@ -10,7 +10,7 @@ import app.util.network as network_util
 config_obj = fastapi_config.get_fastapi_setting()
 
 
-def redis_shell(use_docker: bool = True):
+def redis_shell(use_docker: bool = True) -> None:
     environ: dict[str, str] = {
         "TZ": "Asia/Seoul",
         "REDISCLI_AUTH": config_obj.redis.password or "",

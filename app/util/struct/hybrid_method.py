@@ -1,10 +1,14 @@
+# mypy: disable-error-code="no-untyped-def"
+# TODO: Set proper type hints
+
+
 class hybridmethod:
     """
     This can make us to write classmethod and instancemethod with same name
     From https://stackoverflow.com/a/28238047
     """
 
-    def __init__(self, fclass, finstance=None, doc=None):
+    def __init__(self, fclass, finstance=None, doc=None) -> None:
         self.fclass = fclass
         self.finstance = finstance
         self.__doc__ = doc or fclass.__doc__

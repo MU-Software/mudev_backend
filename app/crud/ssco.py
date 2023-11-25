@@ -2,6 +2,7 @@ import typing
 import uuid
 
 import sqlalchemy as sa
+import typing_extensions as tx
 
 import app.crud.__interface__ as crud_interface
 import app.db.__type__ as db_types
@@ -10,7 +11,8 @@ import app.schema.ssco as ssco_schema
 
 
 class VideoCRUD(crud_interface.CRUDBase[ssco_model.Video, ssco_schema.VideoCreate, ssco_schema.VideoUpdate]):
-    def update(self, *args, **kwargs) -> typing.NoReturn:
+    @tx.override
+    def update(self, *args: tuple, **kwargs: dict) -> typing.NoReturn:  # type: ignore[override]
         raise NotImplementedError
 
     @typing.overload

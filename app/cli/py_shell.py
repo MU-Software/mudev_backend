@@ -3,7 +3,7 @@ import typing
 import IPython
 
 
-def py_shell():
+def py_shell() -> None:
     """
     IPython shell을 실행합니다.
     """

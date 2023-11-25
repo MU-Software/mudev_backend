@@ -30,7 +30,7 @@ def url_format_params(params: dict[str, str]) -> str:
     return "&".join(f"{param[0]}={url_escape(param[1])}" for param in sorted(params.items(), key=lambda x: x[0]))
 
 
-def generate_permission_url(client_id: str, scope: str = "https://mail.google.com/"):
+def generate_permission_url(client_id: str, scope: str = "https://mail.google.com/") -> str:
     params = {
         "client_id": client_id,
         "redirect_uri": REDIRECT_URI,
@@ -40,7 +40,7 @@ def generate_permission_url(client_id: str, scope: str = "https://mail.google.co
     return f'{command_to_url("o/oauth2/auth")}?{url_format_params(params)}'
 
 
-def call_authorize_tokens(client_id: str, client_secret: str, authorization_code: str):
+def call_authorize_tokens(client_id: str, client_secret: str, authorization_code: str) -> dict[str, str]:
     params = {
         "client_id": client_id,
         "client_secret": client_secret,
@@ -59,7 +59,7 @@ def call_authorize_tokens(client_id: str, client_secret: str, authorization_code
     return json.loads(response)
 
 
-def call_refresh_token(client_id, client_secret, refresh_token):
+def call_refresh_token(client_id: str, client_secret: str, refresh_token: str) -> dict[str, str]:
     params = {
         "client_id": client_id,
         "client_secret": client_secret,
@@ -77,21 +77,21 @@ def call_refresh_token(client_id, client_secret, refresh_token):
     return json.loads(response)
 
 
-def generate_oauth2_string(username, access_token, as_base64=False):
+def generate_oauth2_string(username: str, access_token: str, as_base64: bool = False) -> str:
     auth_string = f"user={username}\1auth=Bearer {access_token}\1\1"
     if as_base64:
         auth_string = base64.b64encode(auth_string.encode("ascii")).decode("ascii")
     return auth_string
 
 
-def test_imap(user, auth_string):
+def test_imap(user: str, auth_string: str) -> None:
     imap_conn = imaplib.IMAP4_SSL("imap.gmail.com")
     imap_conn.debug = 4
-    imap_conn.authenticate("XOAUTH2", lambda x: auth_string)
+    imap_conn.authenticate("XOAUTH2", lambda x: auth_string.encode("ascii"))
     imap_conn.select("INBOX")
 
 
-def test_smpt(user, base64_auth_string):
+def test_smpt(user: str, base64_auth_string: str) -> None:
     smtp_conn = smtplib.SMTP("smtp.gmail.com", 587)
     smtp_conn.set_debuglevel(True)
     smtp_conn.ehlo("test")
@@ -99,7 +99,7 @@ def test_smpt(user, base64_auth_string):
     smtp_conn.docmd("AUTH", "XOAUTH2 " + base64_auth_string)
 
 
-def get_authorization(google_client_id, google_client_secret):
+def get_authorization(google_client_id: str, google_client_secret: str) -> tuple[str, str, str]:
     scope = "https://mail.google.com/"
     print("Navigate to the following URL to auth:", generate_permission_url(google_client_id, scope))
     authorization_code = input("Enter verification code: ")
@@ -107,7 +107,7 @@ def get_authorization(google_client_id, google_client_secret):
     return response["refresh_token"], response["access_token"], response["expires_in"]
 
 
-def refresh_authorization(google_client_id, google_client_secret, refresh_token):
+def refresh_authorization(google_client_id: str, google_client_secret: str, refresh_token: str) -> tuple[str, str]:
     response = call_refresh_token(google_client_id, google_client_secret, refresh_token)
     return response["access_token"], response["expires_in"]
 

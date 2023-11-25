@@ -8,5 +8,5 @@ class RedisKeyType(enum.StrEnum):
     EMAIL_PASSWORD_RESET = enum.auto()
     TOKEN_REVOKED = enum.auto()
 
-    def as_redis_key(self, value: str):
+    def as_redis_key(self, value: str) -> str:
         return f"{self.value}:{value}"
