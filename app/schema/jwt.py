@@ -9,24 +9,10 @@ import uuid
 
 import jwt
 import pydantic
-import user_agents as ua
+
+import app.util.mu_string as mu_string
 
 logger = logging.getLogger(__name__)
-
-
-def compare_user_agent(user_agent_a_str: str, user_agent_b_str: str) -> bool:
-    user_agent_a = ua.parse(user_agent_a_str)
-    user_agent_b = ua.parse(user_agent_b_str)
-
-    return all(
-        (
-            user_agent_a.is_mobile == user_agent_b.is_mobile,
-            user_agent_a.is_tablet == user_agent_b.is_tablet,
-            user_agent_a.is_pc == user_agent_b.is_pc,
-            user_agent_a.os.family == user_agent_b.os.family,
-            user_agent_a.browser.family == user_agent_b.browser.family,
-        )
-    )
 
 
 class UserJWTTokenDTO(pydantic.BaseModel):
@@ -92,7 +78,7 @@ class UserJWTToken(pydantic.BaseModel):
 
     @pydantic.model_validator(mode="after")
     def validate(self) -> typing.Self:
-        if not compare_user_agent(self.request_user_agent, self.token_user_agent):
+        if not mu_string.compare_user_agent(self.request_user_agent, self.token_user_agent):
             raise jwt.exceptions.InvalidTokenError("User-Agent does not compatable")
 
         return self

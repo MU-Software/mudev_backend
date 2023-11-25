@@ -9,6 +9,7 @@ import typing
 import unicodedata
 
 import pydantic
+import user_agents as ua
 
 USERNAME_MIN_LEN = 4
 USERNAME_MAX_LEN = 48
@@ -190,3 +191,18 @@ PasswordField = typing.Annotated[
         ),
     ),
 ]
+
+
+def compare_user_agent(user_agent_a_str: str, user_agent_b_str: str) -> bool:
+    user_agent_a = ua.parse(user_agent_a_str)
+    user_agent_b = ua.parse(user_agent_b_str)
+
+    return all(
+        (
+            user_agent_a.is_mobile == user_agent_b.is_mobile,
+            user_agent_a.is_tablet == user_agent_b.is_tablet,
+            user_agent_a.is_pc == user_agent_b.is_pc,
+            user_agent_a.os.family == user_agent_b.os.family,
+            user_agent_a.browser.family == user_agent_b.browser.family,
+        )
+    )
