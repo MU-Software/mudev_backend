@@ -5,6 +5,7 @@ import functools
 import pathlib as pt
 import re
 import secrets
+import typing
 
 import fastapi.openapi.models
 import packaging.version
@@ -21,14 +22,18 @@ AUTHOR_REGEX = re.compile(r"^(?P<name>[\w\s\d\-]+)\s<(?P<email>.+@.+)>$")
 
 class OpenAPISetting(pydantic_settings.BaseSettings):
     # OpenAPI related configs
-    # Only available when restapi_version == "dev"
+    # Only available when debug mode is enabled
     docs_url: str | None = "/docs"
     redoc_url: str | None = "/redoc"
     openapi_url: str | None = "/openapi.json"
     openapi_prefix: str | None = ""
 
+    @classmethod
+    def blank(cls) -> OpenAPISetting:
+        return cls(docs_url=None, redoc_url=None, openapi_url=None, openapi_prefix=None)
 
-class ProjectSetting(OpenAPISetting):
+
+class ProjectSetting(pydantic_settings.BaseSettings):
     title: str
     description: str
     version: str
@@ -66,44 +71,48 @@ class ProjectSetting(OpenAPISetting):
         )
 
 
+class SecuritySetting(pydantic_settings.BaseSettings):
+    https_enabled: bool = True
+    jwt_algorithm: typing.Literal["HS256"] = "HS256"
+
+
 class FastAPISetting(pydantic_settings.BaseSettings):
     host: str
     port: int
 
+    server_name: str = "localhost"  # TODO: host와 합칠 수 있는지 확인 필요함
     restapi_version: str = "v1"
     secret_key: pydantic.SecretStr = pydantic.SecretStr(secrets.token_hex(16))
     cors_origin: list[pydantic.AnyHttpUrl] = []
 
-    debug: bool = False  # Only available when restapi_version == "dev"
+    debug: bool = False
     drop_all_refresh_token_on_load: bool = False
 
     sqlalchemy: sqlalchemy_config.SQLAlchemySetting
     redis: redis_config.RedisSetting
     project: ProjectSetting = ProjectSetting.from_pyproject()
+    openapi: OpenAPISetting = OpenAPISetting()
+    security: SecuritySetting = SecuritySetting()
     route: route_config.RouteSetting
 
     model_config = pydantic_settings.SettingsConfigDict(extra="ignore")
 
     @pydantic.model_validator(mode="after")
-    def validate_model(self) -> FastAPISetting:
-        if self.restapi_version != "dev":
-            self.debug = False
+    def validate_model(self) -> typing.Self:
+        if not self.debug:
             self.drop_all_refresh_token_on_load = False
-
-            self.project.docs_url = None
-            self.project.redoc_url = None
-            self.project.openapi_url = None
-            self.project.openapi_prefix = None
+            self.openapi = OpenAPISetting.blank()
 
         return self
 
     def to_fastapi_config(self) -> dict:
         # See fastapi.FastAPI.__init__ keyword arguments for more details
         project_config: dict = self.project.model_dump()
+        openapi_config: dict = self.openapi.model_dump()
         server_config: dict = {
             "debug": self.debug,
         }
-        return project_config | server_config
+        return project_config | openapi_config | server_config
 
     def to_uvicorn_config(self) -> dict:
         # See uvicorn.config.Config.__init__ keyword arguments for more details
