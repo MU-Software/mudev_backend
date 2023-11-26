@@ -93,32 +93,40 @@ class CRUDBase(typing.Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         return session.scalar(sa.select(self.model).where(self.model.uuid == uuid))
 
     @typing.overload
-    def get_multi_using_query(self, session: db_types.SessionType, query: sa.Select) -> ModelsType:
+    def get_multi_using_query(
+        self,
+        session: db_types.SessionType,
+        query: sa.Select,
+        *,
+        skip: int | None = None,
+        limit: int | None = None,
+    ) -> ModelsType:
         ...
 
     @typing.overload
     def get_multi_using_query(  # type: ignore[misc]
-        self, session: db_types.AsyncSessionType, query: sa.Select
+        self,
+        session: db_types.AsyncSessionType,
+        query: sa.Select,
+        *,
+        skip: int | None = None,
+        limit: int | None = None,
     ) -> AwaitableModelsType:
         ...
 
-    def get_multi_using_query(self, session: db_types.PossibleSessionType, query: sa.Select) -> PossibleModelsType:
-        return session.scalars(query)
-
-    @typing.overload
-    def get_multi(self, session: db_types.SessionType, *, skip: int = 0, limit: int = 100) -> ModelsType:
-        ...
-
-    @typing.overload
-    def get_multi(  # type: ignore[misc]
-        self, session: db_types.AsyncSessionType, *, skip: int = 0, limit: int = 100
-    ) -> AwaitableModelsType:
-        ...
-
-    def get_multi(
-        self, session: db_types.PossibleSessionType, *, skip: int = 0, limit: int = 100
+    def get_multi_using_query(
+        self,
+        session: db_types.PossibleSessionType,
+        query: sa.Select,
+        *,
+        skip: int | None = None,
+        limit: int | None = None,
     ) -> PossibleModelsType:
-        return session.scalars(sa.select(self.model).offset(skip).limit(limit))
+        if skip:
+            query = query.offset(skip)
+        if limit:
+            query = query.limit(limit)
+        return session.scalars(query)
 
     @typing.overload
     def create(self, session: db_types.SessionType, *, obj_in: CreateSchemaType) -> ModelType:
