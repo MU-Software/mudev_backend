@@ -160,7 +160,10 @@ class CRUDBase(typing.Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     def update(
         self, session: db_types.PossibleSessionType, *, db_obj: ModelType, obj_in: UpdateSchemaType
     ) -> PossibleModelType:
+        # The reason why we get db_obj instead of uuid is
+        # because if we get uuid, we cannot support both sync and async as we need to call self.get first.
         map(lambda item: setattr(db_obj, *item), self.encode(obj_in).items())
+
         if session._is_asyncio:
             return commit_and_return(session, db_obj)
         session.commit()
