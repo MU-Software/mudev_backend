@@ -16,6 +16,10 @@ def get_suitable_format(o: typing.Any) -> str:
     raise ValueError(f"Unknown type: {type(o)}")
 
 
+def datetime_to_str(o: datetime.datetime | datetime.date | datetime.time) -> str:
+    return o.strftime(get_suitable_format(o))
+
+
 def get_utcnow(drop_microsecond: bool = False) -> datetime.datetime:
     # python's datetime.datetime.utcnow() does not contains timezone info.
     result = datetime.datetime.now(tz=time_const.UTC)
