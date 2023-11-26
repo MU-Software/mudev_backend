@@ -139,7 +139,7 @@ class CRUDBase(typing.Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         ...
 
     def create(self, session: db_types.PossibleSessionType, *, obj_in: CreateSchemaType) -> PossibleModelType:
-        db_obj = self.model(**self.encode(obj_in))
+        db_obj = self.model(**obj_in.model_dump())
         session.add(db_obj)
 
         if session._is_asyncio:
