@@ -10,7 +10,6 @@ import sqlalchemy.orm as sa_orm
 import app.config.fastapi as fastapi_config
 import app.db.__mixin__ as db_mixin
 import app.db.__type__ as db_types
-import app.util.sqlalchemy as sa_util
 
 config_obj = fastapi_config.get_fastapi_setting()
 ALLOWED_SIGNIN_FAILURES = config_obj.route.account.allowed_signin_failures
@@ -59,11 +58,9 @@ class User(db_mixin.DefaultModelMixin):
     location: sa_orm.Mapped[db_types.Str_Nullable]
     birth: sa_orm.Mapped[db_types.Date_Nullable]
 
-    def to_dict(self) -> dict[str, typing.Any]:
-        return {
-            **sa_util.orm2dict(self),
-            "leftover_signin_failed_attempt": ALLOWED_SIGNIN_FAILURES - self.signin_fail_count,
-        }
+    @property
+    def dict(self) -> typing.Dict[str, typing.Any]:
+        return self.dict | {"leftover_signin_failed_attempt": ALLOWED_SIGNIN_FAILURES - self.signin_fail_count}
 
     @property
     def signin_disabled_reason(self) -> SignInDisabledReason | None:
@@ -83,7 +80,7 @@ class User(db_mixin.DefaultModelMixin):
     @property
     def signin_disabled_reason_message(self) -> str | None:
         if reason := self.signin_disabled_reason:
-            return reason.format(self.to_dict())
+            return reason.format(self.dict)
 
         return None
 

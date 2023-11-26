@@ -47,7 +47,7 @@ class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, 
             await session.commit()
             raise ValueError(
                 user.signin_disabled_reason_message
-                or user_model.SignInDisabledReason.WRONG_PASSWORD.value.format(**user.to_dict())
+                or user_model.SignInDisabledReason.WRONG_PASSWORD.value.format(**user.dict)
             )
 
     async def update_password(

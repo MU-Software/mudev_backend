@@ -1,4 +1,5 @@
 import secrets
+import typing
 
 import sqlalchemy as sa
 import sqlalchemy.ext.declarative as sa_dec
@@ -6,6 +7,7 @@ import sqlalchemy.orm as sa_orm
 import sqlalchemy.sql.schema as sa_schema
 
 import app.db.__type__ as db_types
+import app.util.sqlalchemy as sa_util
 
 
 # I really wanted to use sa_orm.MappedAsDataclass,
@@ -34,3 +36,7 @@ class DefaultModelMixin(sa_orm.DeclarativeBase):
     )
     deleted_at: sa_orm.Mapped[db_types.DateTime_Nullable]
     commit_id: sa_orm.Mapped[str] = sa_orm.mapped_column(default=secrets.token_hex, onupdate=secrets.token_hex)
+
+    @property
+    def dict(self) -> typing.Dict[str, typing.Any]:
+        return sa_util.orm2dict(self)
