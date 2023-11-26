@@ -1,46 +1,15 @@
 from __future__ import annotations
 
-import dataclasses
 import datetime
-import enum
-import logging
 import typing
 import uuid
 
 import jwt
 import pydantic
 
+import app.const.jwt as jwt_const
 import app.util.mu_string as mu_string
-
-logger = logging.getLogger(__name__)
-
-
-class UserJWTTokenDTO(pydantic.BaseModel):
-    class AccessToken(pydantic.BaseModel):
-        token: str
-        exp: datetime.datetime
-
-    class RefreshToken(pydantic.BaseModel):
-        exp: datetime.datetime
-
-    access_token: AccessToken
-    refresh_token: RefreshToken
-
-
-class UserJWTTokenType(enum.Enum):
-    @dataclasses.dataclass(frozen=True)
-    class UserJWTTokenTypeSetting:
-        refresh_delta: datetime.timedelta
-        expiration_delta: datetime.timedelta
-
-    refresh = UserJWTTokenTypeSetting(
-        refresh_delta=datetime.timedelta(days=6),
-        expiration_delta=datetime.timedelta(days=7),
-    )
-    access = UserJWTTokenTypeSetting(
-        refresh_delta=datetime.timedelta(minutes=15),
-        expiration_delta=datetime.timedelta(minutes=30),
-    )
+import app.util.time_util as time_util
 
 
 class UserJWTToken(pydantic.BaseModel):
@@ -49,7 +18,7 @@ class UserJWTToken(pydantic.BaseModel):
     # Registered Claim
     iss: str  # Token Issuer(Fixed)
     exp: pydantic.FutureDatetime  # Expiration Unix Time
-    sub: UserJWTTokenType  # Token name
+    sub: jwt_const.UserJWTTokenType  # Token name
     jti: uuid.UUID  # JWT token ID
 
     # Private Claim
@@ -68,13 +37,26 @@ class UserJWTToken(pydantic.BaseModel):
             }
         )
 
+    @property
+    def access_token(self) -> UserJWTToken:
+        if self.sub != jwt_const.UserJWTTokenType.refresh:
+            raise ValueError("This token is not refresh token")
+
+        return self.model_copy(
+            update={
+                "sub": jwt_const.UserJWTTokenType.access,
+                "exp": time_util.get_utcnow() + jwt_const.UserJWTTokenType.access.value.expiration_delta,
+            },
+            deep=True,
+        )
+
     def as_jwt(self, key: str, algorithm: str) -> str:
         return jwt.encode(payload=self.model_dump(by_alias=True), key=key, algorithm=algorithm)
 
     @pydantic.field_validator("sub", mode="before")
     @classmethod
-    def validate_sub(cls, sub: str | UserJWTTokenType) -> UserJWTTokenType:
-        return sub if isinstance(sub, UserJWTTokenType) else UserJWTTokenType[sub]
+    def validate_sub(cls, sub: str | jwt_const.UserJWTTokenType) -> jwt_const.UserJWTTokenType:
+        return sub if isinstance(sub, jwt_const.UserJWTTokenType) else jwt_const.UserJWTTokenType[sub]
 
     @pydantic.model_validator(mode="after")
     def validate(self) -> typing.Self:
@@ -88,5 +70,5 @@ class UserJWTToken(pydantic.BaseModel):
         return int(exp.timestamp())
 
     @pydantic.field_serializer("sub")
-    def serialize_sub(self, sub: UserJWTTokenType) -> str:
+    def serialize_sub(self, sub: jwt_const.UserJWTTokenType) -> str:
         return sub.name

@@ -7,10 +7,12 @@ import pydantic
 import pydantic_core
 import sqlalchemy as sa
 
+import app.const.jwt as jwt_const
 import app.db.model.user as user_model
 import app.util.mu_string as mu_string
 import app.util.pydantic.normalizer as normalizer
 import app.util.pydantic.with_model as with_model
+import app.util.time_util as time_util
 
 
 class UserDTO(pydantic.BaseModel):
@@ -18,7 +20,7 @@ class UserDTO(pydantic.BaseModel):
     username: mu_string.UsernameField
     nickname: str
     email: pydantic.EmailStr
-    email_verified: bool
+    email_verified_at: pydantic.PastDatetime | None = None
 
     created_at: datetime.datetime
     modified_at: datetime.datetime
@@ -34,6 +36,26 @@ class UserDTO(pydantic.BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UserSignInHistoryDTO(pydantic.BaseModel):
+    ip: pydantic.IPvAnyAddress
+    user_agent: str
+
+    class Config:
+        from_attributes = True
+
+
+class UserJWTTokenDTO(pydantic.BaseModel):
+    class AccessToken(pydantic.BaseModel):
+        token: str
+        exp: datetime.datetime
+
+    class RefreshToken(pydantic.BaseModel):
+        exp: datetime.datetime
+
+    access_token: AccessToken
+    refresh_token: RefreshToken
 
 
 class UserCreate(normalizer.NormalizerModelMixin):  # A.k.a. Sign Up
@@ -135,3 +157,18 @@ class UserSignIn(normalizer.NormalizerModelMixin):
         elif "@" in self.user_ident and mu_string.is_email(self.user_ident):
             return user_model.User.email, self.user_ident
         return user_model.User.username, self.user_ident
+
+
+class UserSignInHistoryCreate(pydantic.BaseModel):
+    user_uuid: uuid.UUID
+    ip: pydantic.IPvAnyAddress
+    user_agent: str
+
+    @pydantic.computed_field  # type: ignore[misc]
+    @property
+    def expires_at(self) -> datetime.datetime:
+        return time_util.get_utcnow() + jwt_const.UserJWTTokenType.refresh.value.expiration_delta
+
+
+class UserSignInHistoryUpdate(pydantic.BaseModel):
+    ...
