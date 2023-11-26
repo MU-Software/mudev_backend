@@ -18,7 +18,7 @@ class Cookie(pydantic.BaseModel):
     httponly: bool = False
     samesite: typing.Literal["lax", "strict", "none"] = "lax"
 
-    @pydantic.field_validator("expires", pre=True)
+    @pydantic.field_validator("expires", mode="before")
     def validate_expires(cls, v: time_util.DateTimeableType = None) -> datetime.datetime:
         return time_util.try_parse_datetime(v, raise_if_not_parseable=True)
 
