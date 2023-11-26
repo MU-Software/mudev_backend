@@ -14,18 +14,14 @@ class Video(db_mixin.DefaultModelMixin):
 class VideoUserRelation(db_mixin.DefaultModelMixin):
     __table_args__ = (sa.UniqueConstraint("video_uuid", "user_uuid"),)
 
-    video_uuid: sa_orm.Mapped[db_types.PrimaryKeyType] = sa_orm.mapped_column(
-        sa.ForeignKey(Video.uuid), nullable=False, index=True
-    )
+    video_uuid: sa_orm.Mapped[db_types.ForeignKeyTypeGenerator(Video.uuid)]
     user_uuid: sa_orm.Mapped[db_types.UserFK]
 
 
 class VideoFileRelation(db_mixin.DefaultModelMixin):
     __table_args__ = (sa.UniqueConstraint("video_uuid", "file_uuid"),)
 
-    video_uuid: sa_orm.Mapped[db_types.PrimaryKeyType] = sa_orm.mapped_column(
-        sa.ForeignKey(Video.uuid), nullable=False, index=True
-    )
+    video_uuid: sa_orm.Mapped[db_types.ForeignKeyTypeGenerator(Video.uuid)]
     file_uuid: sa_orm.Mapped[db_types.FileFK]
 
 
@@ -38,19 +34,13 @@ class Playlist(db_mixin.DefaultModelMixin):
 class PlaylistUserRelation(db_mixin.DefaultModelMixin):
     __table_args__ = (sa.UniqueConstraint("playlist_uuid", "user_uuid"),)
 
-    playlist_uuid: sa_orm.Mapped[db_types.PrimaryKeyType] = sa_orm.mapped_column(
-        sa.ForeignKey(Playlist.uuid), nullable=False, index=True
-    )
+    playlist_uuid: sa_orm.Mapped[db_types.ForeignKeyTypeGenerator(Playlist.uuid)]
     user_uuid: sa_orm.Mapped[db_types.UserFK]
 
 
 class PlaylistVideoRelation(db_mixin.DefaultModelMixin):
     __table_args__ = (sa.UniqueConstraint("playlist_uuid", "index"),)
 
-    playlist_uuid: sa_orm.Mapped[db_types.PrimaryKeyType] = sa_orm.mapped_column(
-        sa.ForeignKey(Playlist.uuid), nullable=False, index=True
-    )
-    video_uuid: sa_orm.Mapped[db_types.PrimaryKeyType] = sa_orm.mapped_column(
-        sa.ForeignKey(Video.uuid), nullable=False, index=True
-    )
+    playlist_uuid: sa_orm.Mapped[db_types.ForeignKeyTypeGenerator(Playlist.uuid)]
+    video_uuid: sa_orm.Mapped[db_types.ForeignKeyTypeGenerator(Video.uuid)]
     index: sa_orm.Mapped[int] = sa_orm.mapped_column(sa.Integer, index=True)
