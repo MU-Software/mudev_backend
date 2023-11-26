@@ -168,7 +168,7 @@ class CRUDBase(typing.Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     ) -> AwaitableModelsType:
         ...
 
-    async def delete(self, session: db_types.PossibleSessionType, *, uuid: str | uuid.UUID) -> PossibleModelsType:
+    def delete(self, session: db_types.PossibleSessionType, *, uuid: str | uuid.UUID) -> PossibleModelsType:
         return session.execute(
             sa.update(self.model).where(self.model.uuid == uuid).values(deleted_at=sa.func.now()).returning(self.model)
         )
@@ -183,5 +183,5 @@ class CRUDBase(typing.Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     ) -> AwaitableModelsType:
         ...
 
-    async def hard_delete(self, session: db_types.PossibleSessionType, *, uuid: str | uuid.UUID) -> PossibleModelsType:
+    def hard_delete(self, session: db_types.PossibleSessionType, *, uuid: str | uuid.UUID) -> PossibleModelsType:
         return session.execute(sa.delete(self.model).where(self.model.uuid == uuid).returning(self.model))
