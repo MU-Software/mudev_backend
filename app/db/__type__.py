@@ -15,9 +15,15 @@ ColumnableType: typing.TypeAlias = str | sa.Column | sa_role.DDLConstraintColumn
 PKRelatedType: typing.TypeAlias = typing.Annotated[type[uuid.UUID], sa_orm.Mapped]
 
 
-def ForeignKeyTypeGenerator(tableinfo: ColumnableType, nullable: bool = False) -> PKRelatedType:
+def ForeignKeyTypeGenerator(columninfo: ColumnableType) -> PKRelatedType:
     return typing.Annotated[  # type: ignore[return-value]
-        uuid.UUID, sa_orm.mapped_column(sa.ForeignKey(tableinfo), nullable=nullable, index=True)
+        uuid.UUID, sa_orm.mapped_column(sa.ForeignKey(columninfo), nullable=False, index=True)
+    ]
+
+
+def NullableForeignKeyTypeGenerator(columninfo: ColumnableType) -> PKRelatedType:
+    return typing.Annotated[  # type: ignore[return-value]
+        uuid.UUID, sa_orm.mapped_column(sa.ForeignKey(columninfo), nullable=True, index=True)
     ]
 
 
