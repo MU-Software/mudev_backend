@@ -33,4 +33,4 @@ class Cookie(pydantic.BaseModel):
         response.set_cookie(**self.model_dump())
 
     def delete_cookie(self, response: fastapi.Response) -> None:
-        response.delete_cookie(**self.model_dump)
+        response.delete_cookie(**self.model_dump())
