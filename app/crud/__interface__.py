@@ -55,7 +55,7 @@ class CRUDBase(typing.Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     @functools.cached_property
     def columns_without_uuid(self) -> set[str]:
-        return self.columns.copy() - {"uuid"}
+        return self.columns - {"uuid"}
 
     def encode(self, obj: typing.Any) -> dict[str, typing.Any]:
         return fastapi.encoders.jsonable_encoder(
