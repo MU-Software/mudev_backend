@@ -128,7 +128,7 @@ class FastAPISetting(pydantic_settings.BaseSettings):
             "domain": self.server_name if self.debug else None,
             "secure": self.security.https_enabled,
             "httponly": True,
-            "samesite": ("None" if self.security.https_enabled else "Lax") if self.debug else "strict",
+            "samesite": ("none" if self.security.https_enabled else "lax") if self.debug else "strict",
         }
 
 
