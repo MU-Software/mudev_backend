@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import datetime
 import enum
 import typing
-import uuid
 
 import argon2
 import sqlalchemy as sa
@@ -12,9 +10,7 @@ import sqlalchemy.orm as sa_orm
 import app.config.fastapi as fastapi_config
 import app.db.__mixin__ as db_mixin
 import app.db.__type__ as db_types
-import app.util.mu_string as mu_string
 import app.util.sqlalchemy as sa_util
-import app.util.time_util as time_util
 
 config_obj = fastapi_config.get_fastapi_setting()
 ALLOWED_SIGNIN_FAILURES = config_obj.route.account.allowed_signin_failures
@@ -38,8 +34,8 @@ class SignInDisabledReason(enum.StrEnum):
 class User(db_mixin.DefaultModelMixin):
     username: sa_orm.Mapped[db_types.Str_Unique]
     nickname: sa_orm.Mapped[db_types.Str_Unique]
-    password: sa_orm.Mapped[str]
-    password_updated_at: sa_orm.Mapped[datetime.datetime] = sa_orm.mapped_column(default=sa.func.now())
+    password: sa_orm.Mapped[db_types.Str]
+    password_updated_at: sa_orm.Mapped[db_types.DateTime] = sa_orm.mapped_column(default=sa.func.now())
 
     # No, We won't support multiple email account
     email: sa_orm.Mapped[db_types.Str_Unique]
@@ -116,30 +112,11 @@ class User(db_mixin.DefaultModelMixin):
             self.locked_reason = SignInDisabledReason.TOO_MUCH_LOGIN_FAIL.value
 
 
-class UserSignInHistoryValidationCase(enum.StrEnum):
-    VALID = enum.auto()
-    EXPIRED = enum.auto()
-    NOT_FOR_THIS_USER = enum.auto()
-
-
 class UserSignInHistory(db_mixin.DefaultModelMixin):
     user_uuid: sa_orm.Mapped[db_types.UserFK]
 
     ip: sa_orm.Mapped[db_types.Str]
     user_agent: sa_orm.Mapped[db_types.Str]
 
-    expires_at: sa_orm.Mapped[datetime.datetime]
-    next_uuid: sa_orm.Mapped[db_types.ForeignKeyTypeGenerator("usersigninhistory.uuid")]  # noqa: F821
-
-    def is_valid(self, user_uuid: str | uuid.UUID, user_agent: str | None = None) -> UserSignInHistoryValidationCase:
-        # TODO: is_valid should not be a method of UserSignInHistory. (This should not be here!)
-        if self.user_uuid != user_uuid:
-            return UserSignInHistoryValidationCase.NOT_FOR_THIS_USER
-
-        if user_agent and not mu_string.compare_user_agent(self.user_agent, user_agent):
-            return UserSignInHistoryValidationCase.NOT_FOR_THIS_USER
-
-        if self.deleted_at or self.expires_at < time_util.get_utcnow():
-            return UserSignInHistoryValidationCase.EXPIRED
-
-        return UserSignInHistoryValidationCase.VALID
+    expires_at: sa_orm.Mapped[db_types.DateTime]
+    next_uuid: sa_orm.Mapped[db_types.NullableForeignKeyTypeGenerator("usersigninhistory.uuid")]  # noqa: F821

@@ -7,12 +7,12 @@ import pydantic_core
 import redis
 import sqlalchemy as sa
 
+import app.config.fastapi as fastapi_config
 import app.const.jwt as jwt_const
 import app.crud.__interface__ as crud_interface
 import app.db.__type__ as db_types
 import app.db.model.user as user_model
 import app.redis.key_type as redis_keytype
-import app.schema.jwt as jwt_schema
 import app.schema.user as user_schema
 import app.util.time_util as time_util
 
@@ -41,13 +41,10 @@ class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, 
         try:
             argon2.PasswordHasher().verify(user.password, obj_in.password)
             user.mark_as_signin_succeed()
-            await session.commit()
-            await session.refresh(user)  # TODO: Remove this line
-            return user
+            return await crud_interface.commit_and_return(session=session, db_obj=user)
         except argon2.exceptions.VerifyMismatchError:
             user.mark_as_signin_failed()
             await session.commit()
-            await session.refresh(user)  # TODO: Remove this line
             raise ValueError(
                 user.signin_disabled_reason_message
                 or user_model.SignInDisabledReason.WRONG_PASSWORD.value.format(**user.to_dict())
@@ -101,48 +98,29 @@ class UserSignInHistoryCRUD(
         redis_key = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(uuid))
         redis_session.set(redis_key, "1", ex=jwt_const.UserJWTTokenType.refresh.value.expiration_delta)
 
-    async def claim_token(
+    async def claim_refresh_token(
         self,
         session: db_types.AsyncSessionType,
         redis_session: redis.Redis,
         *,
         db_obj: user_model.UserSignInHistory,
-        user_uuid: str | uuid.UUID,
-        issuer: str,
+        config_obj: fastapi_config.FastAPISetting,
         request_user_agent: str,
-    ) -> jwt_schema.UserJWTToken:
-        refresh_token_type = jwt_const.UserJWTTokenType.refresh
-
+    ) -> user_schema.RefreshToken:
         redis_key = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(db_obj.uuid))
         if redis_session.get(redis_key):
             if not db_obj.next_uuid:
                 raise ValueError("로그인 기록이 만료되었습니다!")
             db_obj = await self.get(session=session, uuid=db_obj.next_uuid)
 
-        validation_result = db_obj.is_valid(user_uuid, request_user_agent)
-        match (validation_result):
-            case user_model.UserSignInHistoryValidationCase.EXPIRED:
-                if not db_obj.next_uuid:
-                    raise ValueError("로그인 기록이 만료되었습니다!")
-                db_obj = await self.get(session=session, uuid=db_obj.next_uuid)
-            case user_model.UserSignInHistoryValidationCase.NOT_FOR_THIS_USER:
-                raise ValueError("로그인 기록을 찾을 수 없습니다!")
-
+        refresh_token_type = jwt_const.UserJWTTokenType.refresh
         if db_obj.expires_at + refresh_token_type.value.refresh_delta < time_util.get_utcnow():
             db_obj.expires_at = time_util.get_utcnow() + refresh_token_type.value.expiration_delta
 
         db_obj.user_agent = request_user_agent
         await session.commit()
 
-        return jwt_schema.UserJWTToken(
-            iss=issuer,
-            exp=db_obj.expires_at,
-            sub=refresh_token_type,
-            jti=db_obj.uuid,
-            user=db_obj.user_uuid,
-            request_user_agent=db_obj.user_agent,
-            token_user_agent=db_obj.user_agent,
-        )
+        return user_schema.RefreshToken.from_orm(signin_history=db_obj, config_obj=config_obj)
 
 
 userCRUD = UserCRUD(model=user_model.User)
