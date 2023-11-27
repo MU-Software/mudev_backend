@@ -10,24 +10,18 @@ import app.redis as redis_module
 import app.route.common.healthcheck as healthcheck_route
 import app.route.common.user as user_route
 
-fastapi_config_obj = fastapi_config.get_fastapi_setting()
-celery_config_obj = celery_config.get_celery_setting()
-
-
-async def on_app_startup() -> None:
-    await db_module.init_async_db()
-    await redis_module.init_redis()
-
-
-async def on_app_shutdown() -> None:
-    await db_module.close_async_db_connection()
-    await redis_module.close_redis_connection()
-
 
 def create_app(**kwargs: dict) -> fastapi.FastAPI:
+    async def on_app_startup() -> None:
+        await db_module.async_db.open()
+        await redis_module.init_redis()
+
+    async def on_app_shutdown() -> None:
+        await db_module.async_db.close()
+        await redis_module.close_redis_connection()
+
     app = fastapi.FastAPI(
-        **kwargs,
-        **fastapi_config_obj.to_fastapi_config(),
+        **kwargs | fastapi_config.get_fastapi_setting().to_fastapi_config(),
         on_startup=[on_app_startup],
         on_shutdown=[on_app_shutdown],
         middleware=[
@@ -38,13 +32,13 @@ def create_app(**kwargs: dict) -> fastapi.FastAPI:
                 allow_methods=["*"],
                 allow_headers=["*"],
             ),
-        ]
+        ],
     )
     app.mount("/static", fastapi.staticfiles.StaticFiles(directory="app/static"), name="static")
     app.include_router(healthcheck_route.router)
     app.include_router(user_route.router)
 
     celery_app = celery.Celery()
-    celery_app.config_from_object(celery_config_obj)
+    celery_app.config_from_object(celery_config.get_celery_setting())
 
     return app

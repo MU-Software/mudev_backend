@@ -1,5 +1,6 @@
-# TODO: Refactor this from function to class
+import contextlib
 import logging
+import typing
 
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sa_ext_asyncio
@@ -7,116 +8,130 @@ import sqlalchemy.orm as sa_orm
 
 import app.config.fastapi as fastapi_config
 import app.db.__mixin__ as db_mixin
+import app.db.__type__ as db_type
 import app.db.model.user as user_model
+import app.util.mu_type as type_util
 
 logger = logging.getLogger(__name__)
-rdb_async_engine: sa_ext_asyncio.AsyncEngine
-rdb_async_session_maker: sa_ext_asyncio.async_sessionmaker[sa_ext_asyncio.AsyncSession]
-
-rdb_sync_engine: sa.Engine
-rdb_sync_session_maker: sa_orm.session.sessionmaker[sa_orm.session.Session]
 
 
-async def init_async_db() -> None:
-    config_obj = fastapi_config.get_fastapi_setting()
+class SyncDB:
+    config_obj: fastapi_config.FastAPISetting
+    engine: sa.Engine | None = None
+    session_maker: sa_orm.session.sessionmaker[sa_orm.session.Session] | None = None
 
-    # Create DB engine and session pool.
-    global rdb_async_engine, rdb_async_session_maker
-    rdb_async_engine = sa_ext_asyncio.async_engine_from_config(
-        configuration=config_obj.sqlalchemy.to_sqlalchemy_config(),
-        prefix="",
-    )
-    rdb_async_engine.echo = True if config_obj.debug == "dev" else False
-    rdb_async_session_maker = sa_ext_asyncio.async_sessionmaker(rdb_async_engine)
+    def __init__(self, config_obj: fastapi_config.FastAPISetting) -> None:
+        self.config_obj = config_obj
 
-    async with rdb_async_session_maker() as session:
-        # Check if DB is connected
-        try:
-            await session.execute(sa.text("SELECT 1"))
-        except Exception as e:
-            logger.critical(f"DB connection failed: {e}")
-            raise e
+    def open(self) -> None:
+        # Create DB engine and session pool.
+        config = self.config_obj.sqlalchemy.to_sqlalchemy_config()
+        self.engine = sa.engine_from_config(configuration=config, prefix="")
+        self.session_maker = sa_orm.session.sessionmaker(self.engine)
 
-        if config_obj.debug:
-            # Create all tables only IF NOT EXISTS
-            await session.run_sync(
-                lambda _: db_mixin.DefaultModelMixin.metadata.create_all(
-                    bind=rdb_async_engine.engine,
-                    checkfirst=True,
-                )
-            )
+        with self.session_maker() as session:
+            self.check_connection(session)
+            self.create_all_tables(session)
+            self.drop_all_refresh_token_on_load(session)
 
-            if config_obj.drop_all_refresh_token_on_load:
-                # Drop sign-in history tables when on dev mode
-                await session.execute(sa.delete(user_model.UserSignInHistory))
-                await session.commit()
+    def close(self) -> None:
+        # Close DB engine and session pool.
+        self.engine.dispose()
+        self.engine = None
 
+    def __enter__(self) -> typing.Self:
+        self.open()
+        return self
 
-async def close_async_db_connection() -> None:
-    # Close DB engine and session pool.
-    global rdb_async_engine
-    await rdb_async_engine.dispose()
+    def __exit__(self, *args: type_util.ContextExitArgType) -> None:
+        self.close()
 
+    async def __aenter__(self) -> typing.NoReturn:
+        raise NotImplementedError("This method is not supported")
 
-async def get_async_db_session() -> sa_ext_asyncio.AsyncSession:
-    global rdb_async_session_maker
-    try:
-        async with rdb_async_session_maker() as session:
-            yield session
-            await session.commit()
-    except Exception as se:
-        await session.rollback()
-        raise se
-    finally:
-        await session.close()
+    async def __aexit__(self, *args: type_util.ContextExitArgType) -> typing.NoReturn:
+        raise NotImplementedError("This method is not supported")
 
+    @contextlib.contextmanager
+    def get_session(self) -> typing.Generator[sa_orm.session.Session, None, None]:
+        with self.session_maker() as session:
+            try:
+                yield session
+                session.commit()
+            except Exception as se:
+                session.rollback()
+                raise se
+            finally:
+                session.close()
 
-def init_sync_db() -> None:
-    config_obj = fastapi_config.get_fastapi_setting()
-
-    # Create DB engine and session pool.
-    global rdb_sync_engine, rdb_sync_session_maker
-    rdb_sync_engine = sa.engine_from_config(
-        configuration=config_obj.sqlalchemy.to_sqlalchemy_config(),
-        prefix="",
-    )
-    rdb_sync_session_maker = sa_orm.session.sessionmaker(rdb_sync_engine)
-
-    with rdb_sync_session_maker() as session:
-        # Check if DB is connected
+    def check_connection(self, session: db_type.PossibleSessionType) -> None:
+        """Check if DB is connected"""
         try:
             session.execute(sa.text("SELECT 1"))
         except Exception as e:
             logger.critical(f"DB connection failed: {e}")
             raise e
 
-        if config_obj.debug:
-            # Create all tables only IF NOT EXISTS
-            db_mixin.DefaultModelMixin.metadata.create_all(
-                bind=rdb_sync_engine.engine,
-                checkfirst=True,
-            )
+    def create_all_tables(self, session: db_type.PossibleSessionType) -> None:
+        """Create all tables only IF NOT EXISTS on debug mode"""
+        if self.config_obj.debug:
+            db_mixin.DefaultModelMixin.metadata.create_all(bind=self.engine.engine, checkfirst=True)
 
-            if config_obj.drop_all_refresh_token_on_load:
-                # Drop sign-in history tables when on dev mode
-                session.execute(sa.delete(user_model.UserSignInHistory))
-                session.commit()
-
-
-def close_sync_db_connection() -> None:
-    # Close DB engine and session pool.
-    global rdb_sync_engine
-    rdb_sync_engine.dispose()
-
-
-def get_sync_db_session() -> sa_orm.session.Session:
-    global rdb_sync_session_maker
-    try:
-        with rdb_sync_session_maker() as session:
-            yield session
+    def drop_all_refresh_token_on_load(self, session: db_type.PossibleSessionType) -> None:
+        """Drop sign-in history tables on debug mode"""
+        if self.config_obj.debug:
+            session.execute(sa.delete(user_model.UserSignInHistory))
             session.commit()
-    except Exception as se:
-        session.rollback()
-        raise se
-    finally:
-        session.close()
+
+
+class AsyncDB(SyncDB):
+    config_obj: fastapi_config.FastAPISetting
+    engine: sa_ext_asyncio.AsyncEngine | None = None
+    session_maker: sa_ext_asyncio.async_sessionmaker[sa_ext_asyncio.AsyncSession] | None = None
+
+    def __init__(self, config_obj: fastapi_config.FastAPISetting) -> None:
+        self.config_obj = config_obj
+
+    async def open(self) -> None:  # type: ignore[override]
+        # Create DB engine and session pool.
+        config = self.config_obj.sqlalchemy.to_sqlalchemy_config()
+        self.engine = sa_ext_asyncio.async_engine_from_config(configuration=config, prefix="")
+        self.session_maker = sa_ext_asyncio.async_sessionmaker(self.engine, autoflush=False, expire_on_commit=False)
+
+        async with self.session_maker() as session:
+            await session.run_sync(self.check_connection)
+            await session.run_sync(self.create_all_tables)
+            await session.run_sync(self.drop_all_refresh_token_on_load)
+
+    async def close(self) -> None:  # type: ignore[override]
+        # Close DB engine and session pool.
+        await self.engine.dispose()
+        self.engine = None
+
+    def __enter__(self) -> typing.NoReturn:  # type: ignore[override]
+        raise NotImplementedError("This method is not supported")
+
+    def __exit__(self, *args: type_util.ContextExitArgType) -> typing.NoReturn:  # type: ignore[override]
+        raise NotImplementedError("This method is not supported")
+
+    async def __aenter__(self) -> typing.Self:  # type: ignore[override]
+        await self.open()
+        return self
+
+    async def __aexit__(self, *args: type_util.ContextExitArgType) -> None:  # type: ignore[override]
+        await self.close()
+
+    async def get_session(self) -> typing.AsyncGenerator[sa_ext_asyncio.AsyncSession, None]:  # type: ignore[override]
+        async with self.session_maker() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception as se:
+                await session.rollback()
+                raise se
+            finally:
+                await session.close()
+
+
+config_obj = fastapi_config.get_fastapi_setting()
+sync_db, async_db = SyncDB(config_obj=config_obj), AsyncDB(config_obj=config_obj)
