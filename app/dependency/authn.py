@@ -8,6 +8,7 @@ import jwt
 import pydantic
 
 import app.const.cookie as cookie_const
+import app.const.header as header_const
 import app.crud.user as user_crud
 import app.db.model.user as user_model
 import app.dependency.common as common_dep
@@ -23,12 +24,12 @@ class AccessTokenDI(pydantic.BaseModel):
     redis_session: common_dep.redisDI
     user_agent: header_dep.user_agent
     csrf_token: header_dep.csrf_token
-    authorization: typing.Annotated[str, fastapi.Header("Authorization")]
+    authorization: typing.Annotated[str, header_const.HeaderKey.ACCESS_TOKEN.as_dependency()]
 
     model_config = pydantic.ConfigDict(arbitrary_types_allowed=True)
 
     @functools.cached_property
-    def token_obj(self) -> user_schema.AccessToken:
+    def access_token_obj(self) -> user_schema.AccessToken:
         return user_schema.AccessToken.from_token(
             token=self.authorization.replace("Bearer ", ""),
             key=self.setting.secret_key.get_secret_value() + self.csrf_token,
@@ -37,12 +38,12 @@ class AccessTokenDI(pydantic.BaseModel):
 
     @functools.cached_property
     def user(self) -> user_model.User:
-        return user_crud.userCRUD.get(self.db_session, self.token_obj.user)
+        return user_crud.userCRUD.get(self.db_session, self.access_token_obj.user)
 
     @pydantic.model_validator(mode="after")
     def validate_model(self) -> typing.Self:
         # Check token revocation
-        redis_key: str = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(self.token_obj.jti))
+        redis_key: str = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(self.access_token_obj.jti))
         if self.redis_session.get(name=redis_key):
             raise jwt.exceptions.InvalidTokenError("Token is revoked")
 
@@ -50,11 +51,11 @@ class AccessTokenDI(pydantic.BaseModel):
 
 
 class OptionalAccessTokenDI(AccessTokenDI):
-    authorization: typing.Annotated[str | None, fastapi.Header("Authorization")] = None
+    authorization: typing.Annotated[str | None, header_const.HeaderKey.ACCESS_TOKEN.as_dependency()] = None
 
     @functools.cached_property
-    def token_obj(self) -> user_schema.AccessToken | None:
-        return super().token_obj if self.authorization else None
+    def access_token_obj(self) -> user_schema.AccessToken | None:
+        return super().access_token_obj if self.authorization else None
 
     @functools.cached_property
     def user(self) -> user_model.User | None:
@@ -67,39 +68,43 @@ class RefreshTokenDI(pydantic.BaseModel):
     redis_session: common_dep.redisDI
     user_agent: header_dep.user_agent
     csrf_token: header_dep.csrf_token
-    refresh_token: typing.Annotated[str, fastapi.Cookie]
+    refresh_token: typing.Annotated[str, cookie_const.CookieKey.REFRESH_TOKEN.as_dependency()]
 
     model_config = pydantic.ConfigDict(arbitrary_types_allowed=True)
 
     @functools.cached_property
     def signin_history(self) -> user_model.UserSignInHistory:
-        return user_crud.userSignInHistoryCRUD.get(self.db_session, self.token_obj.jti)
+        return user_crud.userSignInHistoryCRUD.get(self.db_session, self.refresh_token_obj.jti)
 
     @functools.cached_property
     def user(self) -> user_model.User:
-        return user_crud.userCRUD.get(self.db_session, self.token_obj.user)
+        return user_crud.userCRUD.get(self.db_session, self.refresh_token_obj.user)
 
-    @property
+    @functools.cached_property
     def cookie(self) -> cookie_util.Cookie:
         return cookie_util.Cookie(
-            key=cookie_const.CookieKey.REFRESH_TOKEN.value,
+            key=cookie_const.CookieKey.REFRESH_TOKEN.get_name(),
             value=self.refresh_token,
-            expires=self.token_obj.exp,
+            expires=self.refresh_token_obj.exp,
             **self.setting.to_cookie_config(),
         )
 
     @functools.cached_property
-    def token_obj(self) -> user_schema.RefreshToken:
+    def refresh_token_obj(self) -> user_schema.RefreshToken:
         return user_schema.RefreshToken.from_token(
             token=self.refresh_token,
             key=self.setting.secret_key.get_secret_value(),
             request_ua=self.user_agent,
         )
 
+    @functools.cached_property
+    def access_token_obj(self) -> user_schema.AccessToken:
+        return self.refresh_token_obj.to_access_token(csrf_token=self.csrf_token)
+
     @pydantic.model_validator(mode="after")
     def validate_model(self) -> typing.Self:
         # Check token revocation
-        redis_key: str = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(self.token_obj.jti))
+        redis_key: str = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(self.refresh_token_obj.jti))
         if self.redis_session.get(name=redis_key):
             raise jwt.exceptions.InvalidTokenError("Token is revoked")
 
