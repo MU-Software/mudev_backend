@@ -15,54 +15,14 @@ import app.util.mu_type as type_util
 logger = logging.getLogger(__name__)
 
 
-class SyncDB:
+class DB:
     config_obj: fastapi_config.FastAPISetting
-    engine: sa.Engine | None = None
-    session_maker: sa_orm.session.sessionmaker[sa_orm.session.Session] | None = None
-
-    def __init__(self, config_obj: fastapi_config.FastAPISetting) -> None:
-        self.config_obj = config_obj
-
-    def open(self) -> None:
-        # Create DB engine and session pool.
-        config = self.config_obj.sqlalchemy.to_sqlalchemy_config()
-        self.engine = sa.engine_from_config(configuration=config, prefix="")
-        self.session_maker = sa_orm.session.sessionmaker(self.engine)
-
-        with self.session_maker() as session:
-            self.check_connection(session)
-            self.create_all_tables(session)
-            self.drop_all_refresh_token_on_load(session)
-
-    def close(self) -> None:
-        # Close DB engine and session pool.
-        self.engine.dispose()
-        self.engine = None
-
-    def __enter__(self) -> typing.Self:
-        self.open()
-        return self
-
-    def __exit__(self, *args: type_util.ContextExitArgType) -> None:
-        self.close()
-
-    async def __aenter__(self) -> typing.NoReturn:
-        raise NotImplementedError("This method is not supported")
-
-    async def __aexit__(self, *args: type_util.ContextExitArgType) -> typing.NoReturn:
-        raise NotImplementedError("This method is not supported")
-
-    @contextlib.contextmanager
-    def get_session(self) -> typing.Generator[sa_orm.session.Session, None, None]:
-        with self.session_maker() as session:
-            try:
-                yield session
-                session.commit()
-            except Exception as se:
-                session.rollback()
-                raise se
-            finally:
-                session.close()
+    engine: sa.Engine | sa_ext_asyncio.AsyncEngine | None = None
+    session_maker: (
+        None
+        | sa_orm.session.sessionmaker[sa_orm.Session]
+        | sa_ext_asyncio.async_sessionmaker[sa_ext_asyncio.AsyncSession]
+    ) = None
 
     def check_connection(self, session: db_type.PossibleSessionType) -> None:
         """Check if DB is connected"""
@@ -84,15 +44,46 @@ class SyncDB:
             session.commit()
 
 
-class AsyncDB(SyncDB):
-    config_obj: fastapi_config.FastAPISetting
+class SyncDB(DB, type_util.SyncConnectedResource):
+    engine: sa.Engine | None = None
+    session_maker: sa_orm.session.sessionmaker[sa_orm.Session] | None = None
+
+    def open(self) -> typing.Self:
+        # Create DB engine and session pool.
+        config = self.config_obj.sqlalchemy.to_sqlalchemy_config()
+        self.engine = sa.engine_from_config(configuration=config, prefix="")
+        self.session_maker = sa_orm.session.sessionmaker(self.engine)
+
+        with self.session_maker() as session:
+            self.check_connection(session)
+            self.create_all_tables(session)
+            self.drop_all_refresh_token_on_load(session)
+
+        return self
+
+    def close(self) -> None:
+        # Close DB engine and session pool.
+        self.engine.dispose()
+        self.engine = None
+
+    @contextlib.contextmanager
+    def get_sync_session(self) -> typing.Generator[sa_orm.Session, None, None]:
+        with self.session_maker() as session:
+            try:
+                yield session
+                session.commit()
+            except Exception as se:
+                session.rollback()
+                raise se
+            finally:
+                session.close()
+
+
+class AsyncDB(DB, type_util.AsyncConnectedResource):
     engine: sa_ext_asyncio.AsyncEngine | None = None
     session_maker: sa_ext_asyncio.async_sessionmaker[sa_ext_asyncio.AsyncSession] | None = None
 
-    def __init__(self, config_obj: fastapi_config.FastAPISetting) -> None:
-        self.config_obj = config_obj
-
-    async def open(self) -> None:  # type: ignore[override]
+    async def aopen(self) -> typing.Self:
         # Create DB engine and session pool.
         config = self.config_obj.sqlalchemy.to_sqlalchemy_config()
         self.engine = sa_ext_asyncio.async_engine_from_config(configuration=config, prefix="")
@@ -103,25 +94,15 @@ class AsyncDB(SyncDB):
             await session.run_sync(self.create_all_tables)
             await session.run_sync(self.drop_all_refresh_token_on_load)
 
-    async def close(self) -> None:  # type: ignore[override]
+        return self
+
+    async def aclose(self) -> None:
         # Close DB engine and session pool.
         await self.engine.dispose()
         self.engine = None
 
-    def __enter__(self) -> typing.NoReturn:  # type: ignore[override]
-        raise NotImplementedError("This method is not supported")
-
-    def __exit__(self, *args: type_util.ContextExitArgType) -> typing.NoReturn:  # type: ignore[override]
-        raise NotImplementedError("This method is not supported")
-
-    async def __aenter__(self) -> typing.Self:  # type: ignore[override]
-        await self.open()
-        return self
-
-    async def __aexit__(self, *args: type_util.ContextExitArgType) -> None:  # type: ignore[override]
-        await self.close()
-
-    async def get_session(self) -> typing.AsyncGenerator[sa_ext_asyncio.AsyncSession, None]:  # type: ignore[override]
+    @contextlib.asynccontextmanager
+    async def get_async_session(self) -> typing.AsyncGenerator[sa_ext_asyncio.AsyncSession, None]:
         async with self.session_maker() as session:
             try:
                 yield session

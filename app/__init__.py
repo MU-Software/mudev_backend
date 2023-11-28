@@ -13,11 +13,11 @@ import app.route.common.user as user_route
 
 def create_app(**kwargs: dict) -> fastapi.FastAPI:
     async def on_app_startup() -> None:
-        await db_module.async_db.open()
+        await db_module.async_db.aopen()
         await redis_module.init_redis()
 
     async def on_app_shutdown() -> None:
-        await db_module.async_db.close()
+        await db_module.async_db.aclose()
         await redis_module.close_redis_connection()
 
     app = fastapi.FastAPI(
