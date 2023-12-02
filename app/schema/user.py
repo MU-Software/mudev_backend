@@ -163,6 +163,7 @@ class UserSignInHistoryCreate(pydantic.BaseModel):
     user_uuid: uuid.UUID
     ip: pydantic.IPvAnyAddress
     user_agent: str
+    config_obj: fastapi_config.FastAPISetting = pydantic.Field(exclude=True)
 
     @pydantic.computed_field  # type: ignore[misc]
     @property
@@ -190,58 +191,25 @@ class UserJWTToken(pydantic.BaseModel):
 
     # For encryption and decryption
     key: str = pydantic.Field(exclude=True)
+    config_obj: fastapi_config.FastAPISetting = pydantic.Field(exclude=True)
 
     JWT_FIELD: typing.ClassVar[set[str]] = {"iss", "exp", "sub", "jti", "user", "user_agent"}
 
     @classmethod
-    def from_token(cls, *, token: str, key: str, request_ua: str) -> UserJWTToken:
-        return cls.model_validate(
-            {
-                **jwt.decode(jwt=token, key=key, algorithms=["HS256"]),
-                "key": key,
-                "request_user_agent": request_ua,
-            }
-        )
-
-    @classmethod
-    def _from_orm(
-        cls,
-        *,
-        sub: jwt_const.UserJWTTokenType,
-        signin_history: user_model.UserSignInHistory,
-        config_obj: fastapi_config.FastAPISetting,
-        key: str,
+    def from_token(
+        cls, *, token: str, key: str, request_user_agent: str, config_obj: fastapi_config.FastAPISetting
     ) -> UserJWTToken:
         return cls(
-            sub=sub,
+            **jwt.decode(jwt=token, key=key, algorithms=["HS256"]),
             key=key,
-            exp=signin_history.expires_at,
-            jti=signin_history.uuid,
-            user=signin_history.user_uuid,
-            user_agent=signin_history.user_agent,
-            request_user_agent=signin_history.user_agent,
-            iss=config_obj.server_name,
+            request_user_agent=request_user_agent,
+            config_obj=config_obj,
         )
-
-    @property
-    def dict(self) -> dict[str, typing.Any]:
-        return dict(self)
 
     @property
     def jwt(self) -> str:
-        payload = mu_json.dict_to_jsonable_dict({k: v for k, v in self.dict.items() if k in self.JWT_FIELD})
+        payload = mu_json.dict_to_jsonable_dict({k: v for k, v in dict(self).items() if k in self.JWT_FIELD})
         return jwt.encode(payload=payload, key=self.key)
-
-    def set_cookie(self, config_obj: fastapi_config.FastAPISetting, response: fastapi.Response) -> None:
-        if not self.sub.value.cookie_key:
-            raise ValueError("This token is not cookie token")
-
-        cookie_util.Cookie(
-            **self.sub.value.cookie_key.to_cookie_config(),
-            **config_obj.to_cookie_config(),
-            value=self.jwt,
-            expires=self.exp,
-        ).set_cookie(response=response)
 
     @pydantic.field_validator("sub", mode="before")
     @classmethod
@@ -263,22 +231,47 @@ class UserJWTToken(pydantic.BaseModel):
     def serialize_sub(self, sub: jwt_const.UserJWTTokenType) -> str:
         return sub.name
 
+    @property
+    def claimed_at(self) -> datetime.datetime:
+        return self.exp - self.sub.value.expiration_delta
+
+    @property
+    def refreshes_at(self) -> datetime.datetime:
+        return self.claimed_at + self.sub.value.refresh_delta
+
+    @property
+    def should_refresh(self) -> bool:
+        return self.refreshes_at < time_util.get_utcnow()
+
+    def set_cookie(self, response: fastapi.Response) -> typing.Self:
+        if not self.sub.value.cookie_key:
+            raise ValueError("This token is not a cookie token")
+
+        cookie_util.Cookie(
+            **self.sub.value.cookie_key.to_cookie_config(),
+            **self.config_obj.to_cookie_config(),
+            value=self.jwt,
+            expires=self.exp,
+        ).set_cookie(response=response)
+        return self
+
 
 class RefreshToken(UserJWTToken):
     sub: typing.Literal[jwt_const.UserJWTTokenType.refresh]
 
     @classmethod
     def from_orm(
-        cls,
-        *,
-        signin_history: user_model.UserSignInHistory,
-        config_obj: fastapi_config.FastAPISetting,
+        cls, *, signin_history: user_model.UserSignInHistory, config_obj: fastapi_config.FastAPISetting
     ) -> RefreshToken:
-        return cls._from_orm(
+        return cls(
+            iss=config_obj.server_name,
+            exp=signin_history.expires_at,
             sub=jwt_const.UserJWTTokenType.refresh,
-            signin_history=signin_history,
-            config_obj=config_obj,
-            key=config_obj.secret_key.get_secret_value(),
+            jti=signin_history.uuid,
+            user=signin_history.user_uuid,
+            user_agent=signin_history.user_agent,
+            request_user_agent=signin_history.user_agent,
+            key=config_obj.secret_key,
         )
 
     @pydantic.model_serializer(mode="plain", when_used="always")
@@ -287,33 +280,21 @@ class RefreshToken(UserJWTToken):
 
     def to_access_token(self, csrf_token: str) -> AccessToken:
         return AccessToken.model_validate(
-            self.dict
+            dict(self)
             | {
                 "key": self.key + csrf_token,
                 "sub": jwt_const.UserJWTTokenType.access,
                 "exp": time_util.get_utcnow() + jwt_const.UserJWTTokenType.access.value.expiration_delta,
-                "user_agent": self.user_agent,  # We need to set explicitly as this is aliased
             }
         )
+
+    def get_response(self, response: fastapi.Response, csrf_token: str) -> dict[str, RefreshToken | AccessToken]:
+        self.set_cookie(response=response)
+        return {"refresh_token": self, "access_token": self.to_access_token(csrf_token=csrf_token)}
 
 
 class AccessToken(UserJWTToken):
     sub: typing.Literal[jwt_const.UserJWTTokenType.access]
-
-    @classmethod
-    def from_orm(
-        cls,
-        *,
-        signin_history: user_model.UserSignInHistory,
-        config_obj: fastapi_config.FastAPISetting,
-        csrf_token: str,
-    ) -> RefreshToken:
-        return cls._from_orm(
-            sub=jwt_const.UserJWTTokenType.access,
-            signin_history=signin_history,
-            config_obj=config_obj,
-            key=config_obj.secret_key.get_secret_value() + csrf_token,
-        )
 
     @pydantic.model_serializer(mode="plain", when_used="always")
     def serialize_model(self) -> dict[str, str | datetime.datetime]:

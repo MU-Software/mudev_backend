@@ -7,14 +7,12 @@ import pydantic_core
 import redis
 import sqlalchemy as sa
 
-import app.config.fastapi as fastapi_config
 import app.const.jwt as jwt_const
 import app.crud.__interface__ as crud_interface
 import app.db.__type__ as db_types
 import app.db.model.user as user_model
 import app.redis.key_type as redis_keytype
 import app.schema.user as user_schema
-import app.util.time_util as time_util
 
 
 class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, user_schema.UserUpdate]):
@@ -73,54 +71,50 @@ class UserSignInHistoryCRUD(
         user_schema.UserSignInHistoryUpdate,
     ]
 ):
-    def update(self, *args: tuple, **kwargs: dict) -> typing.NoReturn:  # type: ignore[override]
-        raise NotImplementedError("UserSignInHistoryCRUD.update is not implemented.")
-
     def delete(self, *args: tuple, **kwargs: dict) -> typing.NoReturn:  # type: ignore[override]
         err_msg = "UserSignInHistoryCRUD.delete is not implemented. Use UserSignInHistoryCRUD.revoke instead."
         raise NotImplementedError(err_msg)
+
+    async def get_using_token_obj(
+        self, session: db_types.AsyncSessionType, *, token_obj: user_schema.UserJWTToken
+    ) -> user_model.UserSignInHistory:
+        if not (db_obj := self.get(session=session, uuid=token_obj.jti)):
+            raise ValueError("로그인 기록을 찾을 수 없습니다!")
+        return db_obj
+
+    async def signin(
+        self, session: db_types.AsyncSessionType, *, obj_in: user_schema.UserSignInHistoryCreate
+    ) -> user_schema.RefreshToken:
+        db_obj = await self.create(session=session, obj_in=obj_in)
+        return user_schema.RefreshToken.from_orm(signin_history=db_obj, config_obj=obj_in.config_obj)
+
+    async def refresh(
+        self,
+        session: db_types.AsyncSessionType,
+        *,
+        token_obj: user_schema.RefreshToken,
+    ) -> user_schema.RefreshToken:
+        if token_obj.should_refresh:
+            db_obj = await self.get_using_token_obj(session=session, token_obj=token_obj)
+            db_obj.expires_at = sa.func.now() + jwt_const.UserJWTTokenType.refresh.value.expiration_delta
+            await session.commit()
+
+        token_obj.exp = db_obj.expires_at
+        return token_obj
 
     async def revoke(
         self,
         session: db_types.AsyncSessionType,
         redis_session: redis.Redis,
         *,
-        uuid: str | uuid.UUID,
-        user_uuid: str | uuid.UUID,
+        token_obj: user_schema.UserJWTToken,
     ) -> None:
-        db_obj: user_model.UserSignInHistory = await self.get(session=session, uuid=uuid)
-        if not (db_obj and db_obj.is_valid(user_uuid)):
-            raise ValueError("로그인 기록을 찾을 수 없습니다!")
-
+        db_obj = await self.get_using_token_obj(session=session, token_obj=token_obj)
         db_obj.deleted_at = db_obj.expires_at = sa.func.now()
         await session.commit()
 
         redis_key = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(uuid))
         redis_session.set(redis_key, "1", ex=jwt_const.UserJWTTokenType.refresh.value.expiration_delta)
-
-    async def claim_refresh_token(
-        self,
-        session: db_types.AsyncSessionType,
-        redis_session: redis.Redis,
-        *,
-        db_obj: user_model.UserSignInHistory,
-        config_obj: fastapi_config.FastAPISetting,
-        request_user_agent: str,
-    ) -> user_schema.RefreshToken:
-        redis_key = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(db_obj.uuid))
-        if redis_session.get(redis_key):
-            if not db_obj.next_uuid:
-                raise ValueError("로그인 기록이 만료되었습니다!")
-            db_obj = await self.get(session=session, uuid=db_obj.next_uuid)
-
-        refresh_token_type = jwt_const.UserJWTTokenType.refresh
-        if db_obj.expires_at + refresh_token_type.value.refresh_delta < time_util.get_utcnow():
-            db_obj.expires_at = time_util.get_utcnow() + refresh_token_type.value.expiration_delta
-
-        db_obj.user_agent = request_user_agent
-        await session.commit()
-
-        return user_schema.RefreshToken.from_orm(signin_history=db_obj, config_obj=config_obj)
 
 
 userCRUD = UserCRUD(model=user_model.User)

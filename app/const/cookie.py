@@ -21,8 +21,8 @@ class CookieKey(enum.Enum):
     def get_name(self) -> str:
         return (self.name if self.value.alias is None else self.value.alias).lower()
 
-    def as_dependency(self) -> fastapi.params.Depends:
-        return fastapi.Depends(fastapi.Cookie(alias=self.get_name()))
+    def as_cookie(self) -> fastapi.params.Cookie:
+        return fastapi.Cookie(alias=self.get_name())
 
     def to_cookie_config(self) -> dict[str, str]:
         result: dict[str, str | None] = {

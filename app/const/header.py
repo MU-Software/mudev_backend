@@ -20,5 +20,5 @@ class HeaderKey(enum.Enum):
     TIMEZONE = HeaderKeyData(alias="X-Timezone", default="Etc/UTC")
     TIMEZONE_OFFSET = HeaderKeyData(alias="X-Timezone-Offset", default="+00:00")
 
-    def as_dependency(self) -> fastapi.params.Depends:
-        return fastapi.Depends(fastapi.Header(alias=self.value.alias, default=self.value.default))
+    def as_header(self) -> fastapi.params.Header:
+        return fastapi.Header(alias=self.value.alias)
