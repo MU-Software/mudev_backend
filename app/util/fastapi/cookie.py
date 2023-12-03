@@ -4,6 +4,7 @@ import typing
 import fastapi
 import pydantic
 
+import app.const.time as time_const
 import app.util.time_util as time_util
 
 
@@ -26,11 +27,17 @@ class Cookie(pydantic.BaseModel):
     def validate_samesite(self) -> typing.Self:
         if self.samesite == "none" and not self.secure:
             raise ValueError("samesite가 none인 경우 secure는 반드시 True여야 합니다.")
-
         return self
+
+    @pydantic.field_serializer("expires", when_used="always")
+    def serialize_expires(self, v: datetime.datetime | None) -> str | None:
+        return v.strftime(time_const.COOKIE_DATETIME_FORMAT) if v else None
 
     def set_cookie(self, response: fastapi.Response) -> None:
         response.set_cookie(**self.model_dump())
 
     def delete_cookie(self, response: fastapi.Response) -> None:
-        response.delete_cookie(**self.model_dump())
+        kwargs = self.model_dump()
+        del kwargs["value"]
+        del kwargs["expires"]
+        response.delete_cookie(**kwargs)

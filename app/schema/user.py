@@ -41,8 +41,7 @@ class UserDTO(pydantic.BaseModel):
     website: str | None = None
     location: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = pydantic.ConfigDict(from_attributes=True)
 
 
 class UserSignInHistoryDTO(pydantic.BaseModel):
@@ -54,8 +53,7 @@ class UserSignInHistoryDTO(pydantic.BaseModel):
     deleted_at: datetime.datetime | None = None
     expires_at: datetime.datetime
 
-    class Config:
-        from_attributes = True
+    model_config = pydantic.ConfigDict(from_attributes=True)
 
 
 class UserCreate(normalizer.NormalizerModelMixin):  # A.k.a. Sign Up
@@ -147,16 +145,16 @@ class UserPasswordUpdateForModel(UserPasswordUpdate, with_model.WithSAModelMixin
 
 
 class UserSignIn(normalizer.NormalizerModelMixin):
-    user_ident: mu_string.UsernameField | pydantic.EmailStr | str
+    username: mu_string.UsernameField | pydantic.EmailStr | str
     password: str
 
     @property
     def signin_type(self) -> tuple[sa.ColumnElement, str]:
-        if self.user_ident.startswith("@"):
-            return user_model.User.username, self.user_ident[1:]
-        elif "@" in self.user_ident and mu_string.is_email(self.user_ident):
-            return user_model.User.email, self.user_ident
-        return user_model.User.username, self.user_ident
+        if self.username.startswith("@"):
+            return user_model.User.username, self.username[1:]
+        elif "@" in self.username and mu_string.is_email(self.username):
+            return user_model.User.email, self.username
+        return user_model.User.username, self.username
 
 
 class UserSignInHistoryCreate(pydantic.BaseModel):
@@ -164,6 +162,11 @@ class UserSignInHistoryCreate(pydantic.BaseModel):
     ip: pydantic.IPvAnyAddress
     user_agent: str
     config_obj: fastapi_config.FastAPISetting = pydantic.Field(exclude=True)
+
+    @pydantic.field_serializer("ip", when_used="always")
+    def serialize_ip(self, v: pydantic.IPvAnyAddress) -> str:
+        # if we save v directly, it will be saved as a ip range in the database
+        return str(v)
 
     @pydantic.computed_field  # type: ignore[misc]
     @property
@@ -208,7 +211,8 @@ class UserJWTToken(pydantic.BaseModel):
 
     @property
     def jwt(self) -> str:
-        payload = mu_json.dict_to_jsonable_dict({k: v for k, v in dict(self).items() if k in self.JWT_FIELD})
+        payload = {k: v for k, v in dict(self).items() if k in self.JWT_FIELD}
+        payload = mu_json.dict_to_jsonable_dict(payload | {"exp": self.exp.timestamp()})
         return jwt.encode(payload=payload, key=self.key)
 
     @pydantic.field_validator("sub", mode="before")
@@ -223,11 +227,11 @@ class UserJWTToken(pydantic.BaseModel):
 
         return self
 
-    @pydantic.field_serializer("exp")
+    @pydantic.field_serializer("exp", when_used="always")
     def serialize_exp(self, exp: datetime.datetime) -> int:
         return int(exp.timestamp())
 
-    @pydantic.field_serializer("sub")
+    @pydantic.field_serializer("sub", when_used="always")
     def serialize_sub(self, sub: jwt_const.UserJWTTokenType) -> str:
         return sub.name
 
@@ -271,7 +275,8 @@ class RefreshToken(UserJWTToken):
             user=signin_history.user_uuid,
             user_agent=signin_history.user_agent,
             request_user_agent=signin_history.user_agent,
-            key=config_obj.secret_key,
+            key=config_obj.secret_key.get_secret_value(),
+            config_obj=config_obj,
         )
 
     @pydantic.model_serializer(mode="plain", when_used="always")
@@ -301,11 +306,6 @@ class AccessToken(UserJWTToken):
         return {"token": self.jwt, "exp": self.exp}
 
 
-class UserJWTDTO(pydantic.BaseModel):
-    access_token: AccessToken
-    refresh_token: RefreshToken
-
-
-class UserSignInDTO(pydantic.BaseModel):
-    user: UserDTO
-    token: UserJWTDTO
+class UserTokenResponse(pydantic.BaseModel):
+    access_token: str
+    token_type: typing.Literal["bearer"] = "bearer"

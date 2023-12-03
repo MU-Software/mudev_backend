@@ -16,13 +16,13 @@ class CookieKey(enum.Enum):
         alias: str | None = None
 
     CSRF_TOKEN = CookieKeyData(path="/", expires=time_const.NEVER_EXPIRE_COOKIE_DATETIME)
-    REFRESH_TOKEN = CookieKeyData(path="/user/refresh/")
+    REFRESH_TOKEN = CookieKeyData(path="/user/")
 
     def get_name(self) -> str:
         return (self.name if self.value.alias is None else self.value.alias).lower()
 
     def as_cookie(self) -> fastapi.params.Cookie:
-        return fastapi.Cookie(alias=self.get_name())
+        return fastapi.Cookie(alias=self.get_name(), include_in_schema=False)
 
     def to_cookie_config(self) -> dict[str, str]:
         result: dict[str, str | None] = {

@@ -5,6 +5,7 @@ import uuid
 
 import fastapi
 import fastapi.responses
+import fastapi.security
 import sqlalchemy as sa
 
 import app.const.cookie as cookie_const
@@ -16,6 +17,7 @@ import app.dependency.common as common_dep
 import app.dependency.header as header_dep
 import app.schema.user as user_schema
 import app.util.fastapi.cookie as cookie_util
+import app.util.mu_string as mu_string
 
 router = fastapi.APIRouter(tags=[tag_const.OpenAPITag.USER], prefix="/user")
 
@@ -43,31 +45,37 @@ async def signup(db_session: common_dep.dbDI, payload: user_schema.UserCreate) -
     return await user_crud.userCRUD.create(db_session, obj_in=payload)
 
 
-@router.post(path="/signin/", response_model=user_schema.UserSignInDTO)
+@router.post(path="/signin/", response_model=user_schema.UserTokenResponse)
 async def signin(
     db_session: common_dep.dbDI,
     config_obj: common_dep.settingDI,
     user_ip: header_dep.user_ip,
     user_agent: header_dep.user_agent,
     csrf_token: header_dep.csrf_token,
-    payload: user_schema.UserSignIn,
+    form_data: typing.Annotated[fastapi.security.OAuth2PasswordRequestForm, fastapi.Depends()],
     response: fastapi.Response,
 ) -> dict:
-    user = await user_crud.userCRUD.signin(db_session, obj_in=payload)
+    if form_data.username.startswith("@"):
+        column, username = user_model.User.username, form_data.username[1:]
+    elif "@" in form_data.username and mu_string.is_email(form_data.username):
+        column, username = user_model.User.email, form_data.username
+    column, username = user_model.User.username, form_data.username
+
+    user = await user_crud.userCRUD.signin(db_session, column=column, user_ident=username, password=form_data.password)
     await db_session.refresh(user)  # TODO: Remove this
 
-    signin_history_create_payload = user_schema.UserSignInHistoryCreate(
-        user_uuid=user.uuid,
-        ip=user_ip,
-        user_agent=user_agent,
-        config_obj=config_obj,
-    )
     refresh_token_obj = await user_crud.userSignInHistoryCRUD.signin(
-        session=db_session, obj_in=signin_history_create_payload
+        session=db_session,
+        obj_in=user_schema.UserSignInHistoryCreate(
+            user_uuid=user.uuid,
+            ip=user_ip,
+            user_agent=user_agent,
+            config_obj=config_obj,
+        ),
     )
-
+    refresh_token_obj.set_cookie(response)
     response.status_code = 201
-    return {"user": user, "token": refresh_token_obj.get_response(response, config_obj)}
+    return {"access_token": refresh_token_obj.to_access_token(csrf_token=csrf_token).jwt}
 
 
 @router.delete(path="/signout/")
@@ -75,7 +83,7 @@ async def signout(
     db_session: common_dep.dbDI,
     redis_session: common_dep.redisDI,
     config_obj: common_dep.settingDI,
-    access_token_di: authn_dep.access_token_di,
+    access_token: authn_dep.access_token_di,
     response: fastapi.Response,
 ) -> fastapi.responses.Response:
     for cookie_key in (cookie_const.CookieKey.REFRESH_TOKEN, cookie_const.CookieKey.CSRF_TOKEN):
@@ -85,17 +93,23 @@ async def signout(
     await user_crud.userSignInHistoryCRUD.revoke(
         session=db_session,
         redis_session=redis_session,
-        token_obj=access_token_di.token_obj,
+        token_obj=access_token,
     )
 
     response.status_code = 204
     return response
 
 
-@router.get(path="/refresh/", response_model=user_schema.UserJWTDTO)
-async def refresh(db_session: common_dep.dbDI, refresh_token: authn_dep.refresh_token_di) -> dict:
-    token_obj = await user_crud.userSignInHistoryCRUD.refresh(session=db_session, token_obj=refresh_token.token_obj)
-    return token_obj.get_response(refresh_token.response, refresh_token.config_obj)
+@router.get(path="/refresh/", response_model=user_schema.UserTokenResponse)
+async def refresh(
+    db_session: common_dep.dbDI,
+    csrf_token: header_dep.csrf_token,
+    refresh_token: authn_dep.refresh_token_di,
+    response: fastapi.Response,
+) -> dict:
+    refresh_token = await user_crud.userSignInHistoryCRUD.refresh(session=db_session, token_obj=refresh_token)
+    refresh_token.set_cookie(response)
+    return {"access_token": refresh_token.to_access_token(csrf_token=csrf_token).jwt, "token_type": "bearer"}
 
 
 @router.post(path="/update-password/", response_model=user_schema.UserDTO)
@@ -106,7 +120,7 @@ async def update_password(
 ) -> user_model.User:
     return await user_crud.userCRUD.update_password(
         session=db_session,
-        uuid=access_token.token_obj.user,
+        uuid=access_token.user,
         obj_in=payload,
     )
 
@@ -120,54 +134,51 @@ async def update_password(
 #     return await user_crud.userCRUD.reset_password(db_session, payload)
 
 
-@router.get(path="/me/", response_model=user_schema.UserDTO)
+@router.get(path="/info/me/", response_model=user_schema.UserDTO)
 async def get_me(db_session: common_dep.dbDI, access_token: authn_dep.access_token_di) -> user_model.User:
-    return user_crud.userCRUD.get(db_session, access_token.token_obj.user)
+    return await user_crud.userCRUD.get(db_session, access_token.user)
 
 
-@router.post(path="/me/", response_model=user_schema.UserDTO)
+@router.post(path="/info/me/", response_model=user_schema.UserDTO)
 async def update_me(
     db_session: common_dep.dbDI,
-    access_token_di: authn_dep.access_token_di,
+    access_token: authn_dep.access_token_di,
     payload: user_schema.UserUpdate,
 ) -> user_model.User:
-    user = await user_crud.userCRUD.get(db_session, access_token_di.token_obj.user)
+    user = await user_crud.userCRUD.get(db_session, access_token.user)
     return await user_crud.userCRUD.update(db_session, db_obj=user, obj_in=payload)
 
 
-@router.get(path="/{username}/", response_model=user_schema.UserDTO)
+@router.get(path="/info/{username}/", response_model=user_schema.UserDTO)
 async def get_user(db_session: common_dep.dbDI, username: str) -> user_model.User:
     stmt = sa.select(user_model.User).where(user_model.User.username == username)
     return await user_crud.userCRUD.get_using_query(db_session, stmt)
 
 
-history_router = fastapi.APIRouter(tags=[tag_const.OpenAPITag.USER_HISTORY], prefix="/signin-history")
-router.include_router(history_router)
-
-
-@history_router.get(path="/", response_model=list[user_schema.UserSignInHistoryDTO])
+@router.get(path="/signin-history/", response_model=list[user_schema.UserSignInHistoryDTO])
 async def get_signin_history(
-    db_session: common_dep.dbDI,
-    access_token_di: authn_dep.access_token_di,
+    db_session: common_dep.dbDI, access_token: authn_dep.access_token_di
 ) -> typing.Iterable[user_model.UserSignInHistory]:
-    user_uuid = access_token_di.token_obj.user
-    stmt = sa.select(user_model.UserSignInHistory).where(user_model.UserSignInHistory.user_uuid == user_uuid)
+    stmt = sa.select(user_model.UserSignInHistory).where(user_model.UserSignInHistory.user_uuid == access_token.user)
     return await user_crud.userSignInHistoryCRUD.get_multi_using_query(db_session, stmt)
 
 
-@history_router.delete(path="/{usih_uuid}")
+@router.delete(path="/signin-history/{usih_uuid}")
 async def revoke_signin_history(
     db_session: common_dep.dbDI,
     redis_session: common_dep.redisDI,
-    access_token_di: authn_dep.access_token_di,
+    access_token: authn_dep.access_token_di,
     usih_uuid: str,
-) -> fastapi.responses.JSONResponse:
-    token_obj = access_token_di.token_obj
-
+    response: fastapi.Response,
+) -> None:
     # TODO: 403 응답을 문서화하기
-    if token_obj.jti == usih_uuid:
+    if str(access_token.jti) == usih_uuid:
         error_msg = "현재 로그인 중인 기기를 로그아웃하시려면, 로그아웃 기능을 사용해주세요."
         raise fastapi.HTTPException(status_code=403, detail=error_msg)
 
-    await user_crud.userSignInHistoryCRUD.revoke(session=db_session, redis_session=redis_session, token_obj=token_obj)
-    return fastapi.responses.JSONResponse(status_code=204)
+    await user_crud.userSignInHistoryCRUD.revoke(
+        session=db_session,
+        redis_session=redis_session,
+        token_obj=access_token,
+    )
+    response.status_code = 204
