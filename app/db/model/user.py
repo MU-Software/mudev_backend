@@ -8,9 +8,11 @@ import sqlalchemy as sa
 import sqlalchemy.orm as sa_orm
 
 import app.config.fastapi as fastapi_config
+import app.const.jwt as jwt_const
 import app.db.__mixin__ as db_mixin
 import app.db.__type__ as db_types
 import app.util.sqlalchemy as sqlalchemy_util
+import app.util.time_util as time_util
 
 config_obj = fastapi_config.get_fastapi_setting()
 ALLOWED_SIGNIN_FAILURES = config_obj.route.account.allowed_signin_failures
@@ -112,11 +114,37 @@ class User(db_mixin.DefaultModelMixin):
             self.locked_reason = SignInDisabledReason.TOO_MUCH_LOGIN_FAIL.value
 
 
+class UserSignInStatus(enum.StrEnum):
+    ACTIVE = enum.auto()
+    REFRESH_REQUIRED = enum.auto()
+    REVOKED = enum.auto()
+    EXPIRED = enum.auto()
+
+
 class UserSignInHistory(db_mixin.DefaultModelMixin):
     user_uuid: sa_orm.Mapped[db_types.UserFK]
 
     ip: sa_orm.Mapped[db_types.Str]
     user_agent: sa_orm.Mapped[db_types.Str]
+    client_token: sa_orm.Mapped[db_types.Str_Nullable]
 
     expires_at: sa_orm.Mapped[db_types.DateTime]
     next_uuid: sa_orm.Mapped[db_types.NullableForeignKeyTypeGenerator("usersigninhistory.uuid")]  # noqa: F821
+
+    @property
+    def status(self) -> UserSignInStatus:
+        if self.next_uuid:
+            # TODO: REFRESH_REQUIRED는 권한 갱신 등 현재 토큰은 만료됐지만 다음 토큰으로 갱신해야 할 시 발생할 수 있습니다.
+            return UserSignInStatus.REFRESH_REQUIRED
+
+        if self.expires_at < time_util.get_utcnow():
+            if self.deleted_at == self.expires_at:
+                return UserSignInStatus.REVOKED
+            return UserSignInStatus.EXPIRED
+
+        claimed_at = self.expires_at - jwt_const.UserJWTTokenType.refresh.value.expiration_delta
+        if claimed_at + jwt_const.UserJWTTokenType.refresh.value.refresh_delta < time_util.get_utcnow():
+            # 곧 만료될 토큰이므로 갱신이 필요합니다.
+            return UserSignInStatus.REFRESH_REQUIRED
+
+        return UserSignInStatus.ACTIVE
