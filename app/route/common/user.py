@@ -155,7 +155,11 @@ async def get_user(db_session: common_dep.dbDI, username: str) -> user_model.Use
     return await user_crud.userCRUD.get_using_query(db_session, stmt)
 
 
-@router.get(path="/signin-history/", response_model=list[user_schema.UserSignInHistoryDTO])
+@router.get(
+    path="/signin-history/",
+    response_model=list[user_schema.UserSignInHistoryDTO],
+    tags=[tag_const.OpenAPITag.USER_SIGNIN_HISTORY],
+)
 async def get_signin_history(
     db_session: common_dep.dbDI, access_token: authn_dep.access_token_di
 ) -> typing.Iterable[user_model.UserSignInHistory]:
@@ -163,7 +167,7 @@ async def get_signin_history(
     return await user_crud.userSignInHistoryCRUD.get_multi_using_query(db_session, stmt)
 
 
-@router.delete(path="/signin-history/{usih_uuid}")
+@router.delete(path="/signin-history/{usih_uuid}", tags=[tag_const.OpenAPITag.USER_SIGNIN_HISTORY])
 async def revoke_signin_history(
     db_session: common_dep.dbDI,
     redis_session: common_dep.redisDI,
