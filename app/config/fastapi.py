@@ -88,6 +88,8 @@ class FastAPISetting(pydantic_settings.BaseSettings):
     debug: bool = False
     drop_all_refresh_token_on_load: bool = False
 
+    upload_dir: pydantic.DirectoryPath
+
     sqlalchemy: sqlalchemy_config.SQLAlchemySetting
     redis: redis_config.RedisSetting
     project: ProjectSetting = ProjectSetting.from_pyproject()

@@ -49,6 +49,18 @@ def is_email(s: str) -> bool:
     return False
 
 
+def to_train_case(snake: str) -> str:
+    """Convert a snake_case string to Train-Case.
+
+    Args:
+        snake: The string to convert.
+
+    Returns:
+        The Train-Case string.
+    """
+    return snake.title().replace("_", "-")
+
+
 class CharType(enum.StrEnum):
     LOWER = enum.auto()
     UPPER = enum.auto()

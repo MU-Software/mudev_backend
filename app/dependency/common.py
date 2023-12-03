@@ -16,4 +16,7 @@ async def async_session_di() -> typing.AsyncGenerator[sa_ext_asyncio.AsyncSessio
 
 dbDI = typing.Annotated[sa_ext_asyncio.AsyncSession, fastapi.Depends(async_session_di)]
 redisDI = typing.Annotated[redis.Redis, fastapi.Depends(redis_module.get_redis_session)]
-settingDI = typing.Annotated[fastapi_config.FastAPISetting, fastapi.Depends(fastapi_config.get_fastapi_setting)]
+settingDI = typing.Annotated[
+    fastapi_config.FastAPISetting,
+    fastapi.Depends(fastapi_config.get_fastapi_setting, use_cache=True),
+]

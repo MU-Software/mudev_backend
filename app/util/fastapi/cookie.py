@@ -31,7 +31,7 @@ class Cookie(pydantic.BaseModel):
 
     @pydantic.field_serializer("expires", when_used="always")
     def serialize_expires(self, v: datetime.datetime | None) -> str | None:
-        return v.strftime(time_const.COOKIE_DATETIME_FORMAT) if v else None
+        return v.strftime(time_const.RFC_7231_GMT_DATETIME_FORMAT) if v else None
 
     def set_cookie(self, response: fastapi.Response) -> None:
         response.set_cookie(**self.model_dump())
