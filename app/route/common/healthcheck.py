@@ -27,11 +27,7 @@ class AccessInfoResponse(HealthCheckResponse):
     user_ip: str
 
 
-@router.get("/healthz", response_model=HealthCheckResponse)
-async def healthz() -> dict[str, str]:
-    return {"message": "ok"}
-
-
+@router.get("/healthz", response_model=HealthCheckResponse, deprecated=True)
 @router.get("/livez", response_model=HealthCheckResponse)
 async def livez() -> dict[str, str]:
     return {"message": "ok"}
