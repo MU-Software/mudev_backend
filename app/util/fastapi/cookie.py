@@ -34,10 +34,7 @@ class Cookie(pydantic.BaseModel):
         return v.strftime(time_const.RFC_7231_GMT_DATETIME_FORMAT) if v else None
 
     def set_cookie(self, response: fastapi.Response) -> None:
-        response.set_cookie(**self.model_dump())
+        response.set_cookie(**self.model_dump(by_alias=True))
 
     def delete_cookie(self, response: fastapi.Response) -> None:
-        kwargs = self.model_dump()
-        del kwargs["value"]
-        del kwargs["expires"]
-        response.delete_cookie(**kwargs)
+        response.delete_cookie(**self.model_dump(by_alias=True, exclude={"value", "expires"}))
