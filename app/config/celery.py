@@ -21,7 +21,7 @@ class CelerySetting(pydantic_settings.BaseSettings):
     result_extended: bool = True
     result_expires: int | None = None
 
-    imports: list[str] = ["app.celery.task"]
+    imports: list[str] = ["app.celery_task.task"]
 
     task_remote_tracebacks: bool = True
     task_track_started: bool = True
