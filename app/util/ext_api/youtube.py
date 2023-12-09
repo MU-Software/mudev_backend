@@ -15,8 +15,6 @@ import PIL.Image
 
 logger = logging.getLogger(__name__)
 
-GOOGLE_API_KEY = "***REMOVED***"  # TODO: FIXME: 환경변수로 변경
-
 VIDEO_REGEX = re.compile(r"(?:youtube\.com|youtu\.be)/(?:[\w-]+\?v=|embed/|v/|shorts/)?([\w-]{11})")
 PLAYLIST_REGEX = re.compile(r"(?:youtube\.com|youtu\.be)\/(?:[\w\-\?\&\=\/]+[?&])list=([\w-]{34})")
 
@@ -52,21 +50,28 @@ def extract_playlist_id_from_youtube_url(url: str) -> str | None:
     return None
 
 
-async def get_thumbnail_img_by_video_id(video_id: str) -> PIL.Image.Image:
+async def get_thumbnail_img_by_video_id(video_id: str) -> bytes:
     async with aiohttp.ClientSession() as session:
         for qualiy in POSSIBLE_THUMBNAIL_QUALITY:
             link: str = f"https://i.ytimg.com/vi/{video_id}/{qualiy}.jpg"
             async with session.get(link) as response:
                 if response.status != 200:
                     continue
+                return await response.content.read()
 
-                return PIL.Image.open(io.BytesIO(await response.content.read()))
-
-    return THUMBNAIL_IMG
+    return THUMBNAIL_BYTES
 
 
-def get_video_ids_from_playlist_id(playlist_id: str) -> set[str]:
-    youtube_client = google_api_discovery.build("youtube", "v3", developerKey=GOOGLE_API_KEY)
+async def download_thumbnail_img_by_video_id(video_id: str, save_path: pt.Path) -> pt.Path:
+    if not save_path.exists():
+        save_path.mkdir(parents=True, exist_ok=True)
+
+    PIL.Image.open(io.BytesIO(await get_thumbnail_img_by_video_id(video_id))).save(save_path, format="PNG")
+    return save_path
+
+
+def get_video_ids_from_playlist_id(playlist_id: str, google_api_key: str) -> set[str]:
+    youtube_client = google_api_discovery.build("youtube", "v3", developerKey=google_api_key)
     video_ids: set[str] = set()
     page_token: str | None = None
 
