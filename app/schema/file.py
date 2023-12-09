@@ -3,17 +3,14 @@ from __future__ import annotations
 import datetime
 import functools
 import mimetypes
-import pathlib as pt
 import typing
 import urllib.parse
 import uuid
 
-import fastapi
 import pydantic
 import pydantic.alias_generators
 
 import app.const.time as time_const
-import app.dependency.common as common_dep
 import app.util.mu_file as mu_file
 import app.util.mu_string as mu_string
 import app.util.time_util as time_util
@@ -112,27 +109,13 @@ class FileMetadataDTO(pydantic.BaseModel):
 
 
 class FileCreate(pydantic.BaseModel):
-    uploadfile: fastapi.UploadFile = pydantic.Field(exclude=True)
+    path: pydantic.FilePath
     data: pydantic.Json | None = None
 
     private: bool = False
     readable: bool = True
     writable: bool = False
-    config_obj: common_dep.settingDI = pydantic.Field(exclude=True)
     created_by_uuid: uuid.UUID
-
-    @pydantic.computed_field  # type: ignore[misc]
-    @functools.cached_property
-    def path(self) -> pt.Path:
-        current_timestamp: int = int(time_util.get_utcnow().timestamp())
-        new_filename: str = f"{current_timestamp}_{self.uploadfile.filename}"
-        save_path = self.config_obj.upload_dir / f"{self.created_by_uuid}" / new_filename
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with save_path.open("wb") as out_file:
-            while content := self.uploadfile.file.read(1024):
-                out_file.write(content)
-        return save_path
 
     @pydantic.computed_field  # type: ignore[misc]
     @functools.cached_property

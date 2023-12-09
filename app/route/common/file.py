@@ -12,6 +12,8 @@ import app.dependency.authn as authn_dep
 import app.dependency.common as common_dep
 import app.schema.file as file_schema
 import app.schema.user as user_schema
+import app.util.mu_file as mu_file
+import app.util.time_util as time_util
 
 router = fastapi.APIRouter(tags=[tag_const.OpenAPITag.USER_FILE], prefix="/file")
 
@@ -100,8 +102,12 @@ async def upload_file(
     writable: typing.Annotated[bool, fastapi.Form()] = False,
 ) -> file_model.File:
     """파일을 업로드합니다."""
+    current_timestamp: int = int(time_util.get_utcnow().timestamp())
+    save_path = config_obj.upload_dir / f"{access_token.user}" / f"{current_timestamp}_{uploadfile.filename}"
+    await mu_file.async_save_tempfile(save_path=save_path, fp=uploadfile.file)
+
     new_file_info = file_schema.FileCreate(
-        uploadfile=uploadfile,
+        path=save_path,
         data=data,
         private=private,
         readable=readable,
