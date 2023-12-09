@@ -28,7 +28,7 @@ ffmpeg-python = "^0.2.0"
 pydantic-settings = "^2.0.3"
 passlib = "^1.7.4"
 argon2-cffi = "^23.1.0"
-psycopg = {extras = ["binary"], version = "^3.1.12"}
+psycopg = {extras = ["binary"], version = "^3.1.14"}
 typer = "^0.9.0"
 python-dateutil = "^2.8.2"
 flower = "^2.0.1"
