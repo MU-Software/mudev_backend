@@ -1,6 +1,9 @@
 import hashlib
 import os
+import pathlib as pt
 import typing
+
+import aiofiles
 
 
 def fileobj_md5(fp: typing.BinaryIO, usedforsecurity: bool = False) -> str:
@@ -14,3 +17,23 @@ def fileobj_md5(fp: typing.BinaryIO, usedforsecurity: bool = False) -> str:
 
 def file_md5(fname: os.PathLike, usedforsecurity: bool = False) -> str:
     return fileobj_md5(open(fname, "rb"), usedforsecurity=usedforsecurity)
+
+
+def save_tempfile(fp: typing.IO[bytes], save_path: pt.Path, *, chunk_size: int = 4096) -> pt.Path:
+    if not save_path.exists():
+        save_path.mkdir(parents=True, exist_ok=True)
+
+    with save_path.open("wb") as f:
+        while chunk := fp.read(chunk_size):
+            f.write(chunk)
+    return save_path
+
+
+async def async_save_tempfile(fp: typing.IO[bytes], save_path: pt.Path, *, chunk_size: int = 4096) -> pt.Path:
+    if not save_path.exists():
+        save_path.mkdir(parents=True, exist_ok=True)
+
+    async with aiofiles.open(save_path, "wb") as f:
+        while chunk := fp.read(chunk_size):
+            await f.write(chunk)
+    return save_path
