@@ -13,6 +13,7 @@ import sqlalchemy as sa
 
 import app.config.fastapi as fastapi_config
 import app.const.jwt as jwt_const
+import app.const.system as system_const
 import app.db.model.user as user_model
 import app.util.fastapi.cookie as cookie_util
 import app.util.mu_json as mu_json
@@ -86,6 +87,20 @@ class UserCreate(normalizer.NormalizerModelMixin):  # A.k.a. Sign Up
     def serialize_password(self, v: str) -> str:
         """DB에 비밀번호의 해시를 저장하도록 합니다."""
         return argon2.PasswordHasher().hash(v)
+
+    @classmethod
+    def for_system_user(cls) -> UserCreate:
+        random_password = str(uuid.uuid4())
+        return cls(
+            username=system_const.SYSTEM_USERNAME,
+            nickname="system",
+            email="system@mudev.cc",
+            password=random_password,
+            password_confirm=random_password,
+            private=True,
+            website="https://mudev.cc",
+            birth=datetime.date.min,
+        )
 
 
 class UserUpdate(normalizer.NormalizerModelMixin, with_model.WithSAModelMixin[user_model.User]):
