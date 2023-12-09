@@ -8,6 +8,7 @@ import redis
 import sqlalchemy as sa
 
 import app.const.jwt as jwt_const
+import app.const.system as system_const
 import app.crud.__interface__ as crud_interface
 import app.db.__type__ as db_types
 import app.db.model.user as user_model
@@ -17,6 +18,18 @@ import app.util.time_util as time_util
 
 
 class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, user_schema.UserUpdate]):
+    async def async_get_system_user(self, session: db_types.AsyncSessionType) -> user_model.User:
+        stmt = sa.select(user_model.User).where(user_model.User.username == system_const.SYSTEM_USERNAME)
+        if system_user := await self.get_using_query(session=session, query=stmt):
+            return system_user
+        return await self.create(session=session, obj_in=user_schema.UserCreate.for_system_user())
+
+    def get_system_user(self, session: db_types.PossibleSessionType) -> user_model.User:
+        stmt = sa.select(user_model.User).where(user_model.User.username == system_const.SYSTEM_USERNAME)
+        if system_user := self.get_using_query(session=session, query=stmt):
+            return system_user
+        return self.create(session=session, obj_in=user_schema.UserCreate.for_system_user())
+
     async def signin(
         self,
         session: db_types.AsyncSessionType,
