@@ -62,6 +62,7 @@ repos:
           - types-redis
           - types-PyYAML
           - types-toml
+          - types-aiofiles
 -   repo: https://github.com/dosisod/refurb
     rev: v1.24.0
     hooks:
