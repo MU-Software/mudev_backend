@@ -11,6 +11,8 @@ LOGLEVEL = typing.Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
 class CelerySetting(pydantic_settings.BaseSettings):
+    debug: bool = False
+
     redis: redis_config.RedisSetting
     broker_url: str | None = None
 
