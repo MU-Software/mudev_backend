@@ -9,7 +9,8 @@ import celery
 import ffmpeg
 import sqlalchemy as sa
 
-import app.celery.__interface__ as celery_interface
+import app.celery_task.__interface__ as celery_interface
+import app.const.celery as celery_const
 import app.crud.file as file_crud
 import app.crud.ssco as ssco_crud
 import app.db.model.ssco as ssco_model
@@ -32,21 +33,25 @@ def raise_if_task_not_runnable(task: celery_interface.SessionTask) -> None:
     if not task.task_instance.startable:
         raise task.retry(**retry_kwargs, exc=RuntimeError("Task is not startable"))
 
-    import app.celery.task.ytdl_updater as ytdl_updater
+    import app.celery_task.task.ytdl_updater as ytdl_updater
 
+    ytdl_updater_task_name: str = ytdl_updater.ytdl_updater_task.name
     stmt = sa.select(sa.exists(task_model.Task)).where(
-        task_model.Task.celery_task_name == ytdl_updater.ytdl_updater_task.name,
-        task_model.Task.done.is_(False),
+        task_model.Task.celery_task_name == ytdl_updater_task_name,
+        task_model.Task.startable.is_(True),
+        task_model.Task.state != celery_const.CeleryTaskStatus.SUCCESS,
     )
-    if bool(task.db_session.execute(stmt).scalar_one_or_none()):
-        raise task.retry(**retry_kwargs, exc=RuntimeError("Updater is running"))
+    with task.db_session as session:
+        if bool(session.execute(stmt).scalar_one_or_none()):
+            task.task_instance.startable = False
+            session.commit()
+            raise task.retry(**retry_kwargs, exc=RuntimeError("Updater is running"))
 
 
 async def get_cover_art_file(youtube_vid: str) -> typing.IO[bytes]:
     tmp_file = tempfile.NamedTemporaryFile(delete=True)
-    (await youtube_util.get_thumbnail_img_by_video_id(video_id=youtube_vid)).save(tmp_file, format="png")
-    tmp_file.flush()
-    tmp_file.seek(0)
+    tmp_file_path = pt.Path(tmp_file.name)
+    await youtube_util.download_thumbnail_img_by_video_id(video_id=youtube_vid, save_path=tmp_file_path)
     return tmp_file
 
 
@@ -85,6 +90,7 @@ async def download_video(
 @celery.shared_task(bind=True, base=celery_interface.SessionTask)
 def ytdl_downloader_task(
     self: celery_interface.SessionTask[None],
+    *,
     youtube_vid: str,
     target_path_str: str,
     user_uuid: uuid.UUID,
@@ -98,24 +104,19 @@ def ytdl_downloader_task(
         video_info_coro = download_video(youtube_vid, target_path, force_overwrite)
         video_info = event_loop.run_until_complete(video_info_coro)
         video_path = video_info.file_path
-        video_record = ssco_crud.videoCRUD.create(
-            self.db_session,
-            obj_in=ssco_schema.VideoCreate(
-                youtube_vid=youtube_vid,
-                title=video_info.title,
-                data=video_info.dumped_json,
-            ),
+        video_create_obj = ssco_schema.VideoCreate(
+            youtube_vid=youtube_vid,
+            title=video_info.title,
+            data=video_info.dumped_json,
         )
+        video_record = ssco_crud.videoCRUD.create(self.db_session, obj_in=video_create_obj)
 
         for filepath in (video_path, video_path.with_suffix(".mp3"), video_path.with_suffix(".m4a")):
-            ssco_crud.videoCRUD.add_file(
-                self.db_session,
-                video_record.uuid,
-                file_crud.fileCRUD.create(
-                    self.db_session,
-                    obj_in=file_schema.FileCreate(file=filepath, created_by_uuid=user_uuid),
-                ).uuid,
-            )
+            with self.db_session as session:
+                file_obj = file_schema.FileCreate(path=filepath, created_by_uuid=user_uuid)
+                file_record = file_crud.fileCRUD.create(session, obj_in=file_obj)
+                ssco_crud.videoCRUD.add_file(session, video_record.uuid, file_record.uuid)
 
-    self.db_session.add(ssco_model.VideoUserRelation(video_uuid=video_record.uuid, user_uuid=user_uuid))
-    self.db_session.commit()
+    with self.db_session as session:
+        session.add(ssco_model.VideoUserRelation(video_uuid=video_record.uuid, user_uuid=user_uuid))
+        session.commit()
