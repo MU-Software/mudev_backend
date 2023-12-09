@@ -20,7 +20,7 @@ eventlet = "^0.33.3"
 celery = {extras = ["redis", "sqlalchemy", "tblib"], version = "^5.3.4"}
 gitpython = "^3.1.37"
 aiohttp = "^3.9.0"
-yt-dlp = "^2023.9.24"
+yt-dlp = "^2023.11.14"
 pillow = "^10.0.1"
 mutagen = "^1.47.0"
 google-api-python-client = "^2.100.0"
