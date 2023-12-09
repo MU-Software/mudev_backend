@@ -2977,13 +2977,13 @@ ocsp = ["cryptography (>=36.0.1)", "pyopenssl (==20.0.1)", "requests (>=2.26.0)"
 
 [[package]]
 name = "refurb"
-version = "1.22.1"
+version = "1.25.0"
 description = "A tool for refurbish and modernize Python codebases"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "refurb-1.22.1-py3-none-any.whl", hash = "sha256:7409fdcb01d73274ef249e729687656fc9cab7b454a5c72d19b8cefefc5aab74"},
-    {file = "refurb-1.22.1.tar.gz", hash = "sha256:3ff6b6f503b0fab9d082a23a0d81ae7bbce59f7b906d5046e863d8ddc46ad529"},
+    {file = "refurb-1.25.0-py3-none-any.whl", hash = "sha256:0bf7887cd193a2f2175731b28037206f46a1c7f8d7153d4f3ec141669860bd16"},
+    {file = "refurb-1.25.0.tar.gz", hash = "sha256:ad65682432d106c9f759bb0f93940d6627931baa75ef8c616e04e4f1cf5c1e21"},
 ]
 
 [package.dependencies]
@@ -3771,4 +3771,4 @@ websockets = "*"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "de4bd8e352bc18549ce19edf468903c6a224b3c8e7b9a79605c616ec3900b489"
+content-hash = "21279358d081bbb261929cb8907e7d35bc4587552072fc9c134c55b9c5301166"
