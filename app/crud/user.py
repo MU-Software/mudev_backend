@@ -132,7 +132,7 @@ class UserSignInHistoryCRUD(
         db_obj.deleted_at = db_obj.expires_at = sa.func.now()
         await session.commit()
 
-        redis_key = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(uuid))
+        redis_key = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(token_obj.user))
         redis_session.set(redis_key, "1", ex=jwt_const.UserJWTTokenType.refresh.value.expiration_delta)
 
 
