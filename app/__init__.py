@@ -1,3 +1,6 @@
+import contextlib
+import typing
+
 import celery
 import fastapi
 import fastapi.middleware.cors
@@ -13,18 +16,22 @@ import app.route.common.user as user_route
 
 
 def create_app(**kwargs: dict) -> fastapi.FastAPI:
-    async def on_app_startup() -> None:
-        await db_module.async_db.aopen()
-        await redis_module.init_redis()
+    config_obj: fastapi_config.FastAPISetting = fastapi_config.get_fastapi_setting()
 
-    async def on_app_shutdown() -> None:
-        await db_module.async_db.aclose()
-        await redis_module.close_redis_connection()
+    @contextlib.asynccontextmanager
+    async def app_lifespan(app: fastapi.FastAPI) -> typing.AsyncGenerator[None, None]:
+        app.state.config_obj = config_obj
+        app.state.async_db = db_module.AsyncDB(config_obj=config_obj)
+        app.state.async_redis = redis_module.AsyncRedis(config_obj=config_obj)
+
+        async with contextlib.AsyncExitStack() as async_stack:
+            await async_stack.enter_async_context(app.state.async_db)  # type: ignore[arg-type]
+            await async_stack.enter_async_context(app.state.async_redis)  # type: ignore[arg-type]
+            yield
 
     app = fastapi.FastAPI(
         **kwargs | fastapi_config.get_fastapi_setting().to_fastapi_config(),
-        on_startup=[on_app_startup],
-        on_shutdown=[on_app_shutdown],
+        lifespan=app_lifespan,
         middleware=[
             fastapi.middleware.Middleware(
                 fastapi.middleware.cors.CORSMiddleware,

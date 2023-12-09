@@ -6,7 +6,6 @@ import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sa_ext_asyncio
 import sqlalchemy.orm as sa_orm
 
-import app.config.fastapi as fastapi_config
 import app.db.__mixin__ as db_mixin
 import app.db.__type__ as db_type
 import app.db.model.user as user_model
@@ -15,8 +14,17 @@ import app.util.mu_type as type_util
 logger = logging.getLogger(__name__)
 
 
+class DBConfigDescriptor(typing.Protocol):
+    class SQLAlchemyConfigDescriptor(typing.Protocol):
+        def to_sqlalchemy_config(self) -> dict[str, typing.Any]:
+            ...
+
+    debug: bool
+    sqlalchemy: SQLAlchemyConfigDescriptor
+
+
 class DB:
-    config_obj: fastapi_config.FastAPISetting
+    config_obj: DBConfigDescriptor
     engine: sa.Engine | sa_ext_asyncio.AsyncEngine | None = None
     session_maker: (
         None
@@ -112,7 +120,3 @@ class AsyncDB(DB, type_util.AsyncConnectedResource):
                 raise se
             finally:
                 await session.close()
-
-
-config_obj = fastapi_config.get_fastapi_setting()
-sync_db, async_db = SyncDB(config_obj=config_obj), AsyncDB(config_obj=config_obj)
