@@ -18,6 +18,7 @@ class HealthCheckResponse(pydantic.BaseModel):
 
 
 class ReadyzResponse(HealthCheckResponse):
+    debug: bool
     database: bool
     cache: bool
 
@@ -34,8 +35,16 @@ async def livez() -> dict[str, str]:
 
 
 @router.get("/readyz", response_model=ReadyzResponse)
-async def readyz(db_session: common_dep.dbDI, redis_session: common_dep.redisDI) -> dict[str, str | bool]:
-    response: dict[str, str | bool] = {"message": "ok", "database": False, "cache": False}
+async def readyz(
+    db_session: common_dep.dbDI, redis_session: common_dep.redisDI, config_obj: common_dep.settingDI
+) -> dict[str, str | bool]:
+    response: dict[str, str | bool] = {
+        "message": "ok",
+        "debug": config_obj.debug,
+        "database": False,
+        "cache": False,
+    }
+
     try:
         await db_session.execute(sa.text("SELECT 1"))
         response["database"] = True
