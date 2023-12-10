@@ -18,13 +18,13 @@ import app.util.time_util as time_util
 
 
 class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, user_schema.UserUpdate]):
-    async def async_get_system_user(self, session: db_types.AsyncSessionType) -> user_model.User:
+    async def async_get_system_user(self, session: db_types.As) -> user_model.User:
         stmt = sa.select(user_model.User).where(user_model.User.username == system_const.SYSTEM_USERNAME)
         if system_user := await self.get_using_query(session=session, query=stmt):
             return system_user
         return await self.create(session=session, obj_in=user_schema.UserCreate.for_system_user())
 
-    def get_system_user(self, session: db_types.PossibleSessionType) -> user_model.User:
+    def get_system_user(self, session: db_types.Ps) -> user_model.User:
         stmt = sa.select(user_model.User).where(user_model.User.username == system_const.SYSTEM_USERNAME)
         if system_user := self.get_using_query(session=session, query=stmt):
             return system_user
@@ -32,7 +32,7 @@ class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, 
 
     async def signin(
         self,
-        session: db_types.AsyncSessionType,
+        session: db_types.As,
         *,
         column: db_types.ColumnableType,
         user_ident: str,
@@ -69,7 +69,7 @@ class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, 
             )
 
     async def update_password(
-        self, session: db_types.AsyncSessionType, *, uuid: str | uuid.UUID, obj_in: user_schema.UserPasswordUpdate
+        self, session: db_types.As, *, uuid: str | uuid.UUID, obj_in: user_schema.UserPasswordUpdate
     ) -> user_model.User:
         user: user_model.User = await self.get(session=session, uuid=uuid)
         if not user:
@@ -96,21 +96,21 @@ class UserSignInHistoryCRUD(
         raise NotImplementedError(err_msg)
 
     async def get_using_token_obj(
-        self, session: db_types.AsyncSessionType, *, token_obj: user_schema.UserJWTToken
+        self, session: db_types.As, *, token_obj: user_schema.UserJWTToken
     ) -> user_model.UserSignInHistory:
         if not (db_obj := await self.get(session=session, uuid=token_obj.jti)):
             raise ValueError("로그인 기록을 찾을 수 없습니다!")
         return db_obj
 
     async def signin(
-        self, session: db_types.AsyncSessionType, *, obj_in: user_schema.UserSignInHistoryCreate
+        self, session: db_types.As, *, obj_in: user_schema.UserSignInHistoryCreate
     ) -> user_schema.RefreshToken:
         db_obj = await self.create(session=session, obj_in=obj_in)
         return user_schema.RefreshToken.from_orm(signin_history=db_obj, config_obj=obj_in.config_obj)
 
     async def refresh(
         self,
-        session: db_types.AsyncSessionType,
+        session: db_types.As,
         *,
         token_obj: user_schema.RefreshToken,
     ) -> user_schema.RefreshToken:
@@ -123,7 +123,7 @@ class UserSignInHistoryCRUD(
 
     async def revoke(
         self,
-        session: db_types.AsyncSessionType,
+        session: db_types.As,
         redis_session: redis.Redis,
         *,
         token_obj: user_schema.UserJWTToken,

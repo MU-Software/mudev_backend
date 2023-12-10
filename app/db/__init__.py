@@ -32,7 +32,7 @@ class DB:
         | sa_ext_asyncio.async_sessionmaker[sa_ext_asyncio.AsyncSession]
     ) = None
 
-    def check_connection(self, session: db_type.PossibleSessionType) -> None:
+    def check_connection(self, session: db_type.Ps) -> None:
         """Check if DB is connected"""
         try:
             session.execute(sa.text("SELECT 1"))
@@ -40,12 +40,12 @@ class DB:
             logger.critical(f"DB connection failed: {e}")
             raise e
 
-    def create_all_tables(self, session: db_type.PossibleSessionType) -> None:
+    def create_all_tables(self, session: db_type.Ps) -> None:
         """Create all tables only IF NOT EXISTS on debug mode"""
         if self.config_obj.debug:
             db_mixin.DefaultModelMixin.metadata.create_all(bind=self.engine.engine, checkfirst=True)
 
-    def drop_all_refresh_token_on_load(self, session: db_type.PossibleSessionType) -> None:
+    def drop_all_refresh_token_on_load(self, session: db_type.Ps) -> None:
         """Drop sign-in history tables on debug mode"""
         if self.config_obj.debug:
             session.execute(sa.delete(user_model.UserSignInHistory))

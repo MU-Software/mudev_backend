@@ -8,9 +8,9 @@ import sqlalchemy.ext.asyncio as sa_ext_asyncio
 import sqlalchemy.orm as sa_orm
 import sqlalchemy.sql.roles as sa_role
 
-SessionType = sa_orm.Session
-AsyncSessionType = sa_ext_asyncio.AsyncSession
-PossibleSessionType = SessionType | AsyncSessionType
+Ss = typing.TypeVar("Ss", bound=sa_orm.Session)
+As = typing.TypeVar("As", bound=sa_ext_asyncio.AsyncSession)
+Ps = typing.TypeVar("Ps", sa_orm.Session, sa_ext_asyncio.AsyncSession)
 ColumnableType: typing.TypeAlias = str | sa.Column | sa_role.DDLConstraintColumnRole | sa_orm.Mapped
 PKRelatedType: typing.TypeAlias = typing.Annotated[type[uuid.UUID], sa_orm.Mapped]
 
