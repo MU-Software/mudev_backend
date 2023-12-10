@@ -1,7 +1,5 @@
-import asyncio
+import logging
 import pathlib as pt
-import sys
-import tempfile
 import typing
 import uuid
 
@@ -13,11 +11,20 @@ import app.celery_task.__interface__ as celery_interface
 import app.const.celery as celery_const
 import app.crud.file as file_crud
 import app.crud.ssco as ssco_crud
+import app.crud.user as user_crud
+import app.db.model.file as file_model
 import app.db.model.ssco as ssco_model
 import app.db.model.task as task_model
 import app.schema.file as file_schema
 import app.schema.ssco as ssco_schema
 import app.util.ext_api.youtube as youtube_util
+
+logger = logging.getLogger(__name__)
+
+
+class FileInfo(typing.TypedDict):
+    path: pt.Path | None
+    uuid: uuid.UUID | None
 
 
 def raise_if_task_not_runnable(task: celery_interface.SessionTask) -> None:
@@ -48,75 +55,64 @@ def raise_if_task_not_runnable(task: celery_interface.SessionTask) -> None:
             raise task.retry(**retry_kwargs, exc=RuntimeError("Updater is running"))
 
 
-async def get_cover_art_file(youtube_vid: str) -> typing.IO[bytes]:
-    tmp_file = tempfile.NamedTemporaryFile(delete=True)
-    tmp_file_path = pt.Path(tmp_file.name)
-    await youtube_util.download_thumbnail_img_by_video_id(video_id=youtube_vid, save_path=tmp_file_path)
-    return tmp_file
-
-
-async def download_video(
-    youtube_vid: str, target_path: pt.Path, force_overwrite: bool = True
-) -> youtube_util.YoutubeDLPResult:
-    video_download_info = await youtube_util.downalod_video_from_video_id(
-        executable_info=["poetry", "run", sys.executable, "-m", "yt_dlp"],
-        video_id=youtube_vid,
-        target_path=target_path,
-        force_overwrite=force_overwrite,
-    )
-
-    # ffmpeg를 이용해 영상 파일을 m4a와 mp3 파일로 변환
-    cover_art_file: typing.IO[bytes] = await get_cover_art_file(youtube_vid)
-    cover_art_path = pt.Path(cover_art_file.name)
-    video_path = video_download_info.file_path
+def convert_video_to_m4a_and_mp3(video_path: pt.Path, coverart_path: pt.Path) -> dict[str, pt.Path]:
+    """ffmpeg를 이용해 영상 파일을 m4a와 mp3 파일로 변환"""
     mp3_path = video_path.with_suffix(".mp3")
     m4a_path = video_path.with_suffix(".m4a")
 
-    ffmpeg_audio_node = (
-        ffmpeg.input(video_path).audio.filter("silenceremove", "1", "0", "-50dB").filter_multi_output("asplit")
-    )
-    ffmpeg_m4a_output_node = ffmpeg_audio_node.stream(1).output(m4a_path.as_posix())
-    ffmpeg_mp3_output_node = (
-        ffmpeg_audio_node.stream(0)
-        .output(ffmpeg.input(cover_art_path), mp3_path.as_posix())
+    original_file_node = ffmpeg.input(video_path)
+    audio_node = original_file_node.audio.filter("silenceremove", "1", "0", "-50dB").filter_multi_output("asplit")
+    m4a_output_node = audio_node.stream(1).output(m4a_path.as_posix())
+    mp3_output_node = (
+        audio_node.stream(0)
+        .output(ffmpeg.input(coverart_path), mp3_path.as_posix())
         .global_args("-disposition:0", "attached_pic")
         .global_args("-id3v2_version", "3")
     )
-    ffmpeg.merge_outputs(ffmpeg_mp3_output_node, ffmpeg_m4a_output_node).run(overwrite_output=True)
+    ffmpeg.merge_outputs(mp3_output_node, m4a_output_node).run(overwrite_output=True)
 
-    return video_download_info
+    return {"mp3": mp3_path, "m4a": m4a_path}
 
 
 @celery.shared_task(bind=True, base=celery_interface.SessionTask)
-def ytdl_downloader_task(
-    self: celery_interface.SessionTask[None],
-    *,
-    youtube_vid: str,
-    target_path_str: str,
-    user_uuid: uuid.UUID,
-    force_overwrite: bool = True,
-) -> None:
-    target_path: pt.Path = pt.Path(target_path_str)
+def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, video_id: str) -> None:
+    """youtube-dl을 이용해 비디오를 다운로드하고, Video와 File row를 생성합니다."""
     raise_if_task_not_runnable(self)
 
-    event_loop = asyncio.get_event_loop()
-    if not (video_record := ssco_crud.videoCRUD.get_by_youtube_vid(self.db_session, youtube_vid=youtube_vid)):
-        video_info_coro = download_video(youtube_vid, target_path, force_overwrite)
-        video_info = event_loop.run_until_complete(video_info_coro)
-        video_path = video_info.file_path
-        video_create_obj = ssco_schema.VideoCreate(
-            youtube_vid=youtube_vid,
-            title=video_info.title,
-            data=video_info.dumped_json,
-        )
-        video_record = ssco_crud.videoCRUD.create(self.db_session, obj_in=video_create_obj)
+    save_dir = self.config_obj.project.upload_to.youtube_video_dir(video_id)
+    download_info = youtube_util.download_video(video_id, save_dir)
 
-        for filepath in (video_path, video_path.with_suffix(".mp3"), video_path.with_suffix(".m4a")):
-            with self.db_session as session:
-                file_obj = file_schema.FileCreate(path=filepath, created_by_uuid=user_uuid)
-                file_record = file_crud.fileCRUD.create(session, obj_in=file_obj)
-                ssco_crud.videoCRUD.add_file(session, video_record.uuid, file_record.uuid)
+    file_paths: dict[str, pt.Path] = {}
+    file_paths["video"] = download_info.file_path
+    file_paths["thumbnail"] = youtube_util.download_thumbnail(video_id, save_dir)
+
+    audio_paths = convert_video_to_m4a_and_mp3(file_paths["video"], file_paths["thumbnail"])
+    file_paths |= audio_paths
 
     with self.db_session as session:
-        session.add(ssco_model.VideoUserRelation(video_uuid=video_record.uuid, user_uuid=user_uuid))
+        system_user = user_crud.userCRUD.get_system_user(session)
+        file_records: dict[str, file_model.File] = {
+            file_type: file_crud.fileCRUD.create(
+                session,
+                obj_in=file_schema.FileCreate(path=path, created_by_uuid=system_user.uuid),
+            )
+            for file_type, path in file_paths.items()
+        }
+
+        video_obj_kwargs = {
+            "title": download_info.title,
+            "thumbnail_uuid": file_records["thumbnail"].uuid,
+            "data": download_info.dumped_json,
+        }
+        video_stmt = sa.select(ssco_model.Video).where(ssco_model.Video.youtube_vid == video_id)
+        assert (video_record := ssco_crud.videoCRUD.get_using_query(session, video_stmt))  # nosec B101
+        video_record = ssco_crud.videoCRUD.update(
+            session,
+            db_obj=video_record,
+            obj_in=ssco_schema.VideoUpdate(**video_obj_kwargs),
+        )
+
+        for file_record in file_records.values():
+            video_record.files.add(file_record)
+
         session.commit()
