@@ -13,6 +13,7 @@ import pydantic
 import pydantic_settings
 import toml
 
+import app.config.project as project_config
 import app.config.redis as redis_config
 import app.config.route as route_config
 import app.config.sqlalchemy as sqlalchemy_config
@@ -33,7 +34,7 @@ class OpenAPISetting(pydantic_settings.BaseSettings):
         return cls(docs_url=None, redoc_url=None, openapi_url=None, openapi_prefix=None)
 
 
-class ProjectSetting(pydantic_settings.BaseSettings):
+class ProjectInfoSetting(pydantic_settings.BaseSettings):
     title: str
     description: str
     version: str
@@ -51,7 +52,7 @@ class ProjectSetting(pydantic_settings.BaseSettings):
         raise ValueError(f"Invalid version: {v}")
 
     @classmethod
-    def from_pyproject(cls) -> ProjectSetting:
+    def from_pyproject(cls) -> ProjectInfoSetting:
         project_info: dict = toml.load(pt.Path.cwd() / "pyproject.toml")["tool"]["poetry"]
 
         contact: fastapi.openapi.models.Contact | None = None
@@ -63,7 +64,7 @@ class ProjectSetting(pydantic_settings.BaseSettings):
                     url=homepage,
                 )
 
-        return ProjectSetting(
+        return ProjectInfoSetting(
             title=project_info["name"],
             description=project_info["description"],
             version=project_info["version"],
@@ -88,11 +89,10 @@ class FastAPISetting(pydantic_settings.BaseSettings):
     debug: bool = False
     drop_all_refresh_token_on_load: bool = False
 
-    upload_dir: pydantic.DirectoryPath
-
     sqlalchemy: sqlalchemy_config.SQLAlchemySetting
     redis: redis_config.RedisSetting
-    project: ProjectSetting = ProjectSetting.from_pyproject()
+    project_info: ProjectInfoSetting = ProjectInfoSetting.from_pyproject()
+    project: project_config.ProjectSetting
     openapi: OpenAPISetting = OpenAPISetting()
     security: SecuritySetting = SecuritySetting()
     route: route_config.RouteSetting
@@ -109,7 +109,7 @@ class FastAPISetting(pydantic_settings.BaseSettings):
 
     def to_fastapi_config(self) -> dict:
         # See fastapi.FastAPI.__init__ keyword arguments for more details
-        project_config: dict = self.project.model_dump()
+        project_config: dict = self.project_info.model_dump()
         openapi_config: dict = self.openapi.model_dump()
         server_config: dict = {
             "debug": self.debug,

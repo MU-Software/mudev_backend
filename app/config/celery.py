@@ -4,6 +4,7 @@ import typing
 import pydantic
 import pydantic_settings
 
+import app.config.project as project_config
 import app.config.redis as redis_config
 import app.config.sqlalchemy as sqlalchemy_config
 
@@ -29,6 +30,8 @@ class CelerySetting(pydantic_settings.BaseSettings):
     worker_send_task_events: bool = True
     worker_prefetch_multiplier: int = 1
     worker_redirect_stdouts_level: LOGLEVEL = "DEBUG"
+
+    project: project_config.ProjectSetting
 
     model_config = pydantic_settings.SettingsConfigDict(extra="ignore")
 
