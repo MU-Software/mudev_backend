@@ -1,19 +1,27 @@
-import asyncio
+from __future__ import annotations
+
 import base64
-import dataclasses
+import contextlib
+import functools
 import io
 import json
 import logging
 import pathlib as pt
 import re
-import subprocess as sp  # nosec B404
+import sys
+import typing
 import zlib
 
-import aiohttp
 import googleapiclient.discovery as google_api_discovery
 import PIL.Image
+import pydantic
+import requests
+
+import app.util.subprocess_util as sp_util
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_YOUTUBE_DL_EXECUTABLE_INFO: list[str] = ["poetry", "run", sys.executable, "-m", "yt_dlp"]
 
 VIDEO_REGEX = re.compile(r"(?:youtube\.com|youtu\.be)/(?:[\w-]+\?v=|embed/|v/|shorts/)?([\w-]{11})")
 PLAYLIST_REGEX = re.compile(r"(?:youtube\.com|youtu\.be)\/(?:[\w\-\?\&\=\/]+[?&])list=([\w-]{34})")
@@ -38,47 +46,44 @@ THUMBNAIL_BYTES: bytes = zlib.decompress(base64.b64decode(THUMBNAIL_B64))
 THUMBNAIL_IMG: PIL.Image.Image = PIL.Image.frombytes(data=THUMBNAIL_BYTES, size=(50, 50), mode="RGBA")
 
 
-def extract_video_id_from_youtube_url(url: str) -> str | None:
+def extract_vid_from_url(url: str) -> str | None:
     if match := VIDEO_REGEX.search(url):
         return match.group(1)
     return None
 
 
-def extract_playlist_id_from_youtube_url(url: str) -> str | None:
+def extract_pid_from_url(url: str) -> str | None:
     if match := PLAYLIST_REGEX.search(url):
         return match.group(1)
     return None
 
 
-async def get_thumbnail_img_by_video_id(video_id: str) -> bytes:
-    async with aiohttp.ClientSession() as session:
-        for qualiy in POSSIBLE_THUMBNAIL_QUALITY:
-            link: str = f"https://i.ytimg.com/vi/{video_id}/{qualiy}.jpg"
-            async with session.get(link) as response:
-                if response.status != 200:
-                    continue
-                return await response.content.read()
+def get_thumbnail_bytes(video_id: str) -> bytes:
+    for qualiy in POSSIBLE_THUMBNAIL_QUALITY:
+        with contextlib.suppress(requests.exceptions.RequestException):
+            response = requests.get(f"https://i.ytimg.com/vi/{video_id}/{qualiy}.jpg", timeout=5)
+            if response.ok:
+                return response.content
 
     return THUMBNAIL_BYTES
 
 
-async def download_thumbnail_img_by_video_id(video_id: str, save_path: pt.Path) -> pt.Path:
-    if not save_path.exists():
-        save_path.mkdir(parents=True, exist_ok=True)
-
-    PIL.Image.open(io.BytesIO(await get_thumbnail_img_by_video_id(video_id))).save(save_path, format="PNG")
+def download_thumbnail(video_id: str, save_dir: pt.Path) -> pt.Path:
+    save_dir.mkdir(parents=True, exist_ok=True)
+    save_path = save_dir / "thumbnail.png"
+    save_path.unlink(missing_ok=True)
+    PIL.Image.open(io.BytesIO(get_thumbnail_bytes(video_id))).save(save_path, format="PNG")
     return save_path
 
 
 def get_video_ids_from_playlist_id(playlist_id: str, google_api_key: str) -> set[str]:
     youtube_client = google_api_discovery.build("youtube", "v3", developerKey=google_api_key)
+    playlist_items_api = youtube_client.playlistItems()
     video_ids: set[str] = set()
     page_token: str | None = None
 
     while True:
-        items = (
-            youtube_client.playlistItems().list(part="snippet", playlistId=playlist_id, pageToken=page_token).execute()
-        )
+        items: dict = playlist_items_api.list(part="snippet", playlistId=playlist_id, pageToken=page_token).execute()
         video_ids.update(item["snippet"]["resourceId"]["videoId"] for item in items["items"])
         if not (page_token := items.get("nextPageToken")):
             break
@@ -86,24 +91,16 @@ def get_video_ids_from_playlist_id(playlist_id: str, google_api_key: str) -> set
     return video_ids
 
 
-@dataclasses.dataclass
-class YoutubeVideoInfo:
-    id: str
-    title: str
-    quality: str
+def get_youtube_dl_version() -> str | None:
+    cmdline = [*DEFAULT_YOUTUBE_DL_EXECUTABLE_INFO, "--version"]
+    if (result := sp_util.run(cmdline, check=False)).returncode != 0:
+        return None
+    return result.stdout.strip()
 
 
-@dataclasses.dataclass
-class YoutubeDLPResult(YoutubeVideoInfo):
-    stdout: str
-    stderr: str
-    dumped_json: dict
-    file_path: pt.Path
-
-
-async def get_video_info_from_video_id(executable_info: list[str], video_id: str) -> YoutubeVideoInfo:
-    cmdline = [
-        *executable_info,
+def get_youtube_dl_video_info_cmdline(video_id: str) -> list[str]:
+    return [
+        *DEFAULT_YOUTUBE_DL_EXECUTABLE_INFO,
         f"https://www.youtube.com/watch?v={video_id}",
         "-o",
         "%(title)s.%(ext)s",
@@ -118,28 +115,13 @@ async def get_video_info_from_video_id(executable_info: list[str], video_id: str
         "--print",
         "format",
     ]
-    process = await asyncio.create_subprocess_exec(*cmdline, stdout=sp.PIPE, stderr=sp.PIPE)
-    stdout, _ = map(lambda x: x.decode(), await process.communicate())
-    if process.returncode != 0:
-        raise RuntimeError(f"youtube-dlp failed - returncode: {process.returncode}")
-    if not stdout:
-        raise RuntimeError("youtube-dlp failed - no stdout")
-
-    infos: list[str] = list(map(lambda x: x.strip(), stdout.splitlines()))
-    return YoutubeVideoInfo(id=video_id, title=infos[0], quality=infos[1])
 
 
-async def downalod_video_from_video_id(
-    executable_info: list[str],
-    video_id: str,
-    target_path: pt.Path,
-    force_overwrite: bool = True,
-) -> YoutubeDLPResult:
-    if not target_path.exists():
-        target_path.mkdir(parents=True, exist_ok=True)
-
-    cmdline: list[str] = [
-        *executable_info,
+def get_youtube_dl_download_cmdline(video_id: str, save_dir: pt.Path, overwrite: bool = True) -> list[str]:
+    save_dir.mkdir(parents=True, exist_ok=True)
+    save_dir = save_dir.absolute()
+    return [
+        *DEFAULT_YOUTUBE_DL_EXECUTABLE_INFO,
         f"https://www.youtube.com/watch?v={video_id}",
         "--verbose",
         "--dump-json",
@@ -153,31 +135,105 @@ async def downalod_video_from_video_id(
         "--concat-playlist",
         "never",
         "-P",
-        target_path.absolute().as_posix(),
+        save_dir.as_posix(),
         "-o",
         "%(title)s.%(ext)s",
-        "--force-overwrites" if force_overwrite else "--no-force-overwrites",
+        "--force-overwrites" if overwrite else "--no-force-overwrites",
         "--print",
         "after_move:filepath",
     ]
-    process = await asyncio.create_subprocess_exec(*cmdline, stdout=sp.PIPE, stderr=sp.PIPE)
-    stdout, stderr = map(lambda x: x.decode(), await process.communicate())
-    if process.returncode != 0:
-        raise RuntimeError(f"youtube-dlp failed - returncode: {process.returncode}")
-    if not stdout:
-        raise RuntimeError("youtube-dlp failed - no stdout")
 
-    output = stdout.splitlines()
-    if not (file_path := pt.Path(output[-1])).exists():
-        raise RuntimeError("youtube-dlp failed - no file")
-    dumped_json: dict = json.loads(output[-2])
 
-    return YoutubeDLPResult(
-        id=video_id,
-        title=dumped_json["title"],
-        quality=dumped_json["format"],
-        stdout=stdout,
-        stderr=stderr,
-        dumped_json=dumped_json,
-        file_path=file_path,
-    )
+class YouTubeDLPVideoInfo(pydantic.BaseModel):
+    video_id: str
+    stdout: str
+    stderr: str
+
+    @pydantic.computed_field  # type: ignore[misc]
+    @functools.cached_property
+    def title(self) -> str:
+        return self.stdout.splitlines()[0].strip()
+
+    @pydantic.computed_field  # type: ignore[misc]
+    @functools.cached_property
+    def quality(self) -> str:
+        return self.stdout.splitlines()[1].strip()
+
+    @pydantic.model_validator(mode="after")
+    def validate(self) -> typing.Self:
+        if not (self.title and self.quality):
+            raise ValueError("Invalid stdout")
+        return self
+
+
+class YouTubeDLPDownloadResult(pydantic.BaseModel):
+    video_id: str
+    stdout: str
+    stderr: str
+
+    @pydantic.computed_field  # type: ignore[misc]
+    @functools.cached_property
+    def dumped_json(self) -> dict[str, typing.Any]:
+        return json.loads(self.stdout.splitlines()[0])
+
+    @pydantic.computed_field  # type: ignore[misc]
+    @functools.cached_property
+    def file_path(self) -> pt.Path:
+        return pt.Path(self.stdout.splitlines()[1])
+
+    @pydantic.computed_field  # type: ignore[misc]
+    @functools.cached_property
+    def id(self) -> str:
+        return self.dumped_json["id"]
+
+    @pydantic.computed_field  # type: ignore[misc]
+    @functools.cached_property
+    def title(self) -> str:
+        return self.dumped_json["title"]
+
+    @pydantic.computed_field  # type: ignore[misc]
+    @functools.cached_property
+    def quality(self) -> str:
+        return self.dumped_json["format"]
+
+    @pydantic.model_validator(mode="after")
+    def validate(self) -> typing.Self:
+        if not self.file_path.exists():
+            raise FileNotFoundError
+        return self
+
+
+def get_video_info(video_id: str) -> YouTubeDLPVideoInfo:
+    cmdline = get_youtube_dl_video_info_cmdline(video_id)
+    try:
+        result = sp_util.run(cmdline, check=True)
+        return YouTubeDLPVideoInfo(video_id=video_id, stdout=result.stdout, stderr=result.stderr)
+    except Exception as e:
+        raise RuntimeError("youtube-dlp failed") from e
+
+
+async def async_get_video_info(video_id: str) -> YouTubeDLPVideoInfo:
+    cmdline = get_youtube_dl_video_info_cmdline(video_id)
+    try:
+        result = await sp_util.async_run(cmdline, check=True)
+        return YouTubeDLPVideoInfo(video_id=video_id, stdout=result.stdout, stderr=result.stderr)
+    except Exception as e:
+        raise RuntimeError("youtube-dlp failed") from e
+
+
+def download_video(video_id: str, save_dir: pt.Path, overwrite: bool = True) -> YouTubeDLPDownloadResult:
+    cmdline = get_youtube_dl_download_cmdline(video_id, save_dir, overwrite)
+    try:
+        result = sp_util.run(cmdline, check=True)
+        return YouTubeDLPDownloadResult(video_id=video_id, stdout=result.stdout, stderr=result.stderr)
+    except Exception as e:
+        raise RuntimeError("youtube-dlp failed") from e
+
+
+async def async_download_video(video_id: str, save_dir: pt.Path, overwrite: bool = True) -> YouTubeDLPDownloadResult:
+    cmdline = get_youtube_dl_download_cmdline(video_id, save_dir, overwrite)
+    try:
+        result = await sp_util.async_run(cmdline, check=True)
+        return YouTubeDLPDownloadResult(video_id=video_id, stdout=result.stdout, stderr=result.stderr)
+    except Exception as e:
+        raise RuntimeError("youtube-dlp failed") from e
