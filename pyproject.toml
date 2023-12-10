@@ -11,7 +11,7 @@ python = "^3.11"
 fastapi = "^0.103.1"
 pydantic = "^2.3.0"
 redis = {version = "<5.0.0", extras = ["hiredis"]}  # celery 5.3.4 does not support ^5.0.0 yet
-SQLAlchemy = "^2.0.23"
+SQLAlchemy = {extras = ["greenlet"], version = "^2.0.23"}
 uvicorn = "^0.23.2"
 gunicorn = "^21.2.0"
 alembic = {extras = ["tz"], version = "^1.12.0"}
