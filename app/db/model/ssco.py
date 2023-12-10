@@ -3,12 +3,18 @@ import sqlalchemy.orm as sa_orm
 
 import app.db.__mixin__ as db_mixin
 import app.db.__type__ as db_types
+import app.db.model.file as file_model
+import app.db.model.user as user_model
 
 
 class Video(db_mixin.DefaultModelMixin):
     youtube_vid: sa_orm.Mapped[db_types.Str_Unique]
-    title: sa_orm.Mapped[db_types.Str]
+    title: sa_orm.Mapped[db_types.Str_Nullable]
+    thumbnail_uuid: sa_orm.Mapped[db_types.FileFK_Nullable]
     data: sa_orm.Mapped[db_types.Json_Nullable]
+
+    users: sa_orm.Mapped[set[user_model.User]] = sa_orm.relationship(secondary="videouserrelation")
+    files: sa_orm.Mapped[set[file_model.File]] = sa_orm.relationship(secondary="videofilerelation")
 
 
 class VideoUserRelation(db_mixin.DefaultModelMixin):
