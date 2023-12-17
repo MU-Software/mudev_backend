@@ -43,7 +43,10 @@ local-run:
 	@poetry run python -m app
 
 local-celery:
-	@poetry run python -m app.celery_task
+	@poetry run python -m app.celery_task worker
+
+local-beat:
+	@poetry run python -m app.celery_task beat
 
 local-flower:
 	@poetry run python -m app.celery_task flower
