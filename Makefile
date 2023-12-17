@@ -21,6 +21,20 @@ ifeq (makemigration,$(firstword $(MAKECMDGOALS)))
 endif
 MIGRATION_MESSAGE := $(if $(MIGRATION_MESSAGE),$(MIGRATION_MESSAGE),migration)
 
+ifeq (docker-build,$(firstword $(MAKECMDGOALS)))
+  IMAGE_NAME := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  $(eval $(IMAGE_NAME):;@:)
+endif
+IMAGE_NAME := $(if $(IMAGE_NAME),$(IMAGE_NAME),snowfall_image)
+
+ifeq ($(DOCKER_DEBUG),true)
+	DOCKER_MID_BUILD_OPTIONS = --progress=plain --no-cache
+	DOCKER_END_BUILD_OPTIONS = 2>&1 | tee docker-build.log
+else
+	DOCKER_MID_BUILD_OPTIONS =
+	DOCKER_END_BUILD_OPTIONS =
+endif
+
 
 guard-%:
 	@if [ "${${*}}" = "" ]; then \
@@ -38,20 +52,41 @@ db-upgrade:
 db-downgrade:
 	@poetry run alembic downgrade $(DOWNGRADE_VERSION)
 
+# Docker compose setup
+# This is for local development, use mudev-infra repo for production
+docker-compose-up:
+	docker-compose -f ./infra/docker-compose-dev.yaml up -d
+
+docker-compose-down:
+	docker-compose -f ./infra/docker-compose-dev.yaml down
+
+docker-compose-rm: docker-compose-down
+	docker-compose -f ./infra/docker-compose-dev.yaml rm
+
+# Docker image build for production
+# Usage: make docker-build <image-name:=snowfall_image>
+# if you want to build with debug mode, set DOCKER_DEBUG=true
+# ex) make docker-build snowfall_image DOCKER_DEBUG=true
+docker-build:
+	docker build \
+		-f ./infra/Dockerfile --target runtime -t $(IMAGE_NAME) \
+		--build-arg INVALIDATE_CACHE_DATE=$(shell date +%Y-%m-%d_%H:%M:%S) \
+		$(DOCKER_MID_BUILD_OPTIONS) $(PROJECT_DIR) $(DOCKER_END_BUILD_OPTIONS)
+
 # For local environments
-local-run:
+local-api: docker-compose-up
 	@poetry run python -m app
 
-local-celery:
+local-celery: docker-compose-up
 	@poetry run python -m app.celery_task worker
 
-local-beat:
+local-beat: docker-compose-up
 	@poetry run python -m app.celery_task beat
 
-local-flower:
+local-flower: docker-compose-up
 	@poetry run python -m app.celery_task flower
 
-local-celery-healthcheck:
+local-celery-healthcheck: docker-compose-up
 	@poetry run python -m app.celery_task healthcheck
 
 prod-run:
