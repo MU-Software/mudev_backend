@@ -15,7 +15,6 @@ ifeq (prod-update,$(firstword $(MAKECMDGOALS)))
 endif
 UPDATE_TARGET_GIT_HASH := $(if $(UPDATE_TARGET_GIT_HASH),$(UPDATE_TARGET_GIT_HASH),$(GIT_MAIN_BRANCH_HEAD_HASH))
 
-
 ifeq (makemigration,$(firstword $(MAKECMDGOALS)))
   MIGRATION_MESSAGE := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
   $(eval $(MIGRATION_MESSAGE):;@:)
@@ -79,3 +78,13 @@ hooks-lint:
 	poetry run pre-commit run --all-files
 
 lint: hooks-lint  # alias
+
+hooks-mypy:
+	poetry run pre-commit run mypy --all-files
+
+mypy: hooks-mypy  # alias
+
+# CLI tools
+cli-%:
+	@if [[ -z "$*" || "$*" == '.o' ]]; then echo "Usage: make cli-<command>"; exit 1; fi
+	poetry run python -m app.cli $*
