@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 config_obj = fastapi_config.get_fastapi_setting()
 
 
-def drop_and_create_tables() -> None:
+def reset_db() -> None:
     if not config_obj.debug:
         raise Exception("This command can only be used in debug mode.")
 
@@ -32,4 +32,4 @@ def drop_and_create_tables() -> None:
             session.commit()
 
 
-cli_patterns: list[typing.Callable] = [drop_and_create_tables] if config_obj.debug else []
+cli_patterns: list[typing.Callable] = [reset_db] if config_obj.debug else []
