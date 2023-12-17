@@ -43,13 +43,13 @@ local-run:
 	@poetry run python -m app
 
 local-celery:
-	@poetry run python -m app.celery
+	@poetry run python -m app.celery_task
 
 local-flower:
-	@poetry run python -m app.celery flower
+	@poetry run python -m app.celery_task flower
 
 local-celery-healthcheck:
-	@poetry run python -m app.celery healthcheck
+	@poetry run python -m app.celery_task healthcheck
 
 prod-run:
 	@poetry run gunicorn --bind $(HOST):$(PORT) 'app:create_app()' --worker-class uvicorn.workers.UvicornWorker
