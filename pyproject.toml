@@ -10,14 +10,14 @@ readme = "README.md"
 python = "^3.11"
 fastapi = "^0.103.1"
 pydantic = "^2.3.0"
-redis = {version = "<5.0.0", extras = ["hiredis"]}  # celery 5.3.4 does not support ^5.0.0 yet
+redis = {version = "^5.0.0", extras = ["hiredis"]}
 SQLAlchemy = {extras = ["greenlet"], version = "^2.0.23"}
 uvicorn = "^0.23.2"
 gunicorn = "^21.2.0"
 alembic = {extras = ["tz"], version = "^1.12.0"}
 python-dotenv = "^1.0.0"
 eventlet = "^0.33.3"
-celery = {extras = ["redis", "sqlalchemy", "tblib"], version = "^5.3.4"}
+celery = {extras = ["redis", "sqlalchemy", "tblib"], version = "^5.3.6"}
 gitpython = "^3.1.37"
 aiohttp = "^3.9.0"
 yt-dlp = "^2023.11.14"
