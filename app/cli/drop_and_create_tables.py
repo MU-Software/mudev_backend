@@ -2,6 +2,7 @@ import logging
 import typing
 
 import app.config.fastapi as fastapi_config
+import app.crud.user as user_crud
 import app.db as db_module
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,10 @@ def drop_and_create_tables() -> None:
             # Create all tables
             db_module.db_mixin.DefaultModelMixin.metadata.create_all(bind=db.engine, checkfirst=True)
             logger.warning("All tables created.")
+
+            # Create system user
+            user_crud.userCRUD.get_system_user(session=session)
+            logger.warning("System user created.")
 
             session.commit()
 
