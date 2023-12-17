@@ -2,7 +2,6 @@ import functools
 import typing
 import uuid
 
-import fastapi.encoders
 import pydantic
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sa_ext_asyncio
@@ -42,15 +41,6 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
     @functools.cached_property
     def columns_without_uuid(self) -> set[str]:
         return self.columns - {"uuid"}
-
-    def encode(self, obj: typing.Any) -> dict[str, typing.Any]:
-        return fastapi.encoders.jsonable_encoder(
-            obj,
-            include=self.columns_without_uuid,
-            exclude_unset=True,
-            exclude_defaults=True,
-            sqlalchemy_safe=True,
-        )
 
     @typing.overload
     def get_using_query(self, session: db_types.Ss, query: sa.Select) -> M | None:
