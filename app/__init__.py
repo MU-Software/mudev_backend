@@ -9,6 +9,7 @@ import fastapi.staticfiles
 import app.config.celery as celery_config
 import app.config.fastapi as fastapi_config
 import app.db as db_module
+import app.error_handler as error_handler_module
 import app.redis as redis_module
 import app.route.common.file as file_route
 import app.route.common.healthcheck as healthcheck_route
@@ -32,6 +33,7 @@ def create_app(**kwargs: dict) -> fastapi.FastAPI:
     app = fastapi.FastAPI(
         **kwargs | fastapi_config.get_fastapi_setting().to_fastapi_config(),
         lifespan=app_lifespan,
+        exception_handlers=error_handler_module.get_error_handlers(),
         middleware=[
             fastapi.middleware.Middleware(
                 fastapi.middleware.cors.CORSMiddleware,

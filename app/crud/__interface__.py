@@ -6,8 +6,10 @@ import pydantic
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sa_ext_asyncio
 
+import app.const.error as error_const
 import app.db.__mixin__ as db_mixin
 import app.db.__type__ as db_types
+import app.util.sqlalchemy as sa_util
 
 T = typing.TypeVar("T")
 M = typing.TypeVar("M", bound=db_mixin.DefaultModelMixin)
@@ -96,7 +98,17 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
         ...
 
     def create(self, session: db_types.Ps, obj_in: CreateSchema) -> M | typing.Awaitable[M]:
-        db_obj = self.model(**obj_in.model_dump())
+        db_obj: M = self.model(**obj_in.model_dump())
+
+        nulled_columns: set[str] = {k for k, v in sa_util.orm2dict(db_obj).items() if v is None}
+        not_nullable_columns: set[str] = {c.name for c in sa_util.get_not_nullable_columns(self.model)}
+        if nn_failed_columns := not_nullable_columns & nulled_columns:
+            errors = [
+                error_const.ErrorStruct.value_error(msg="This field is required", field_name=column_name)
+                for column_name in nn_failed_columns
+            ]
+            raise error_const.errorstruct_to_validationerror(errors)
+
         session.add(db_obj)
 
         if session._is_asyncio:

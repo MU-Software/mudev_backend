@@ -122,4 +122,4 @@ class SessionTask(celery.Task, typing.Generic[T]):
         return super().update_state(task_id=task_id, state=state, meta=meta, **kwargs)
 
     def apply_async(self, *args: tuple, **kwargs: dict) -> celery.result.AsyncResult:
-        return super().apply_async(task_id=self.task_id, *args, **kwargs)
+        return super().apply_async(*args, **kwargs, task_id=self.task_id)

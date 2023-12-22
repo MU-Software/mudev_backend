@@ -1,12 +1,12 @@
+import contextlib
 import typing
 import uuid
 
 import argon2
-import pydantic
-import pydantic_core
 import redis
 import sqlalchemy as sa
 
+import app.const.error as error_const
 import app.const.jwt as jwt_const
 import app.const.system as system_const
 import app.crud.__interface__ as crud_interface
@@ -40,33 +40,34 @@ class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, 
     ) -> user_model.User:
         stmt = sa.select(self.model).where(column == user_ident)
 
+        error: error_const.ErrorStruct | None = None
         if not (user := await session.scalar(stmt)):
-            error: pydantic_core.InitErrorDetails = {
-                "type": "value_error",
-                "loc": ("username",),
-                "msg": "계정을 찾을 수 없어요, 이메일 또는 아이디를 확인해주세요!",
-                "input": user_ident,
-                "ctx": {"error": ValueError("계정을 찾을 수 없어요, 이메일 또는 아이디를 확인해주세요!")},
-                "url": "https://errors.pydantic.dev/2/v/value_error",
-            }
-            raise pydantic.ValidationError.from_exception_data(
-                title="1 validation error for UserSignIn",
-                line_errors=[error],
+            error = error_const.ErrorStruct.value_error(
+                msg="계정을 찾을 수 없어요, 이메일 또는 아이디를 확인해주세요!",
+                field_name="username",
+                input=user_ident,
             )
         elif signin_disabled_reason_msg := user.signin_disabled_reason_message:
-            raise ValueError(signin_disabled_reason_msg)
+            error = error_const.ErrorStruct.value_error(
+                msg=signin_disabled_reason_msg,
+                field_name="username",
+                input=user_ident,
+            )
+        if error:
+            raise error_const.errorstruct_to_validationerror(errors=[error])
 
-        try:
+        with contextlib.suppress(argon2.exceptions.VerifyMismatchError):
             argon2.PasswordHasher().verify(user.password, password)
             user.mark_as_signin_succeed()
             return await crud_interface.commit_and_return(session=session, db_obj=user)
-        except argon2.exceptions.VerifyMismatchError:
-            user.mark_as_signin_failed()
-            await session.commit()
-            raise ValueError(
-                user.signin_disabled_reason_message
-                or user_model.SignInDisabledReason.WRONG_PASSWORD.value.format(**user.dict)
-            )
+
+        user.mark_as_signin_failed()
+        await session.commit()
+
+        default_err_msg = user_model.SignInDisabledReason.WRONG_PASSWORD.value.format(**user.dict)
+        error_msg = user.signin_disabled_reason_message or default_err_msg
+        error = error_const.ErrorStruct.value_error(msg=error_msg, field_name="password")
+        raise error_const.errorstruct_to_validationerror(errors=[error])
 
     async def update_password(
         self, session: db_types.As, *, uuid: str | uuid.UUID, obj_in: user_schema.UserPasswordUpdate
