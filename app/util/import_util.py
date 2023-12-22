@@ -6,16 +6,16 @@ import app.util.mu_stdlib as utils
 T = typing.TypeVar("T")
 
 
-def auto_import_patterns(pattern_prefix: str, file_prefix: str, dir: pt.Path) -> list[T]:
-    collected_patterns: list[T] = []
-    for module_path in dir.glob(f"{file_prefix}*.py"):
+def auto_import_objs(pattern_name: str, file_prefix: str, dir: pt.Path) -> list[T]:
+    collected_objs: list[T] = []
+    for module_path in dir.glob(f"**/{file_prefix}*.py"):
         if module_path.stem.startswith("__"):
             continue
 
-        module = utils.load_module(module_path)
-        pattern_name = f"{pattern_prefix}_patterns"
-        if not utils.isiterable(patterns := typing.cast(T, getattr(module, pattern_name, None))):
-            continue
+        if obj := typing.cast(T, getattr(utils.load_module(module_path), pattern_name, None)):
+            collected_objs.append(obj)
+    return collected_objs
 
-        collected_patterns.append(patterns)
-    return collected_patterns
+
+def auto_import_patterns(pattern_name: str, file_prefix: str, dir: pt.Path) -> list[T]:
+    return list(filter(utils.isiterable, auto_import_objs(pattern_name, file_prefix, dir)))

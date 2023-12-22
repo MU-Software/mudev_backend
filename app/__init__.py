@@ -11,9 +11,7 @@ import app.config.fastapi as fastapi_config
 import app.db as db_module
 import app.error_handler as error_handler_module
 import app.redis as redis_module
-import app.route.common.file as file_route
-import app.route.common.healthcheck as healthcheck_route
-import app.route.common.user as user_route
+import app.route as route_module
 
 
 def create_app(**kwargs: dict) -> fastapi.FastAPI:
@@ -45,9 +43,8 @@ def create_app(**kwargs: dict) -> fastapi.FastAPI:
         ],
     )
     app.mount("/static", fastapi.staticfiles.StaticFiles(directory="app/static"), name="static")
-    app.include_router(healthcheck_route.router)
-    app.include_router(user_route.router)
-    app.include_router(file_route.router)
+    for route in route_module.get_routes():
+        app.include_router(route)
 
     celery_app = celery.Celery()
     celery_app.config_from_object(celery_config.get_celery_setting())

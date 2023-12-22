@@ -8,7 +8,7 @@ import app.util.import_util as import_util
 
 def get_error_handlers() -> err_type.ErrHandlersDef:
     error_handler_collection: list[err_type.ErrHandlersDef] = import_util.auto_import_patterns(
-        "error_handler",
+        "error_handler_patterns",
         "err_",
         pt.Path(__file__).parent,
     )
