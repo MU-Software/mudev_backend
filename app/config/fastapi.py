@@ -80,6 +80,7 @@ class SecuritySetting(pydantic_settings.BaseSettings):
 class FastAPISetting(pydantic_settings.BaseSettings):
     host: str
     port: int
+    root_path: str = ""
 
     server_name: str = "localhost"  # TODO: host와 합칠 수 있는지 확인 필요함
     restapi_version: str = "v1"
@@ -112,6 +113,7 @@ class FastAPISetting(pydantic_settings.BaseSettings):
         project_config: dict = self.project_info.model_dump()
         openapi_config: dict = self.openapi.model_dump()
         server_config: dict = {
+            "root_path": self.root_path,
             "debug": self.debug,
         }
         return project_config | openapi_config | server_config
