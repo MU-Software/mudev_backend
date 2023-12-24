@@ -82,7 +82,7 @@ class FastAPISetting(pydantic_settings.BaseSettings):
     port: int
     root_path: str = ""
 
-    server_name: str = "localhost"  # TODO: host와 합칠 수 있는지 확인 필요함
+    server_name: str = "localhost"
     restapi_version: str = "v1"
     secret_key: pydantic.SecretStr = pydantic.SecretStr(secrets.token_hex(16))
     cors_origin: list[pydantic.AnyHttpUrl] = []
