@@ -84,7 +84,7 @@ class ErrorEnum(ErrorEnumMixin, enum.StrEnum):
                 "type": type_name,
                 "msg": self.value,
                 **self.__default_args__,
-                **self.__additional_args__.get(type_name, {}),
+                **self.__additional_args__.get(self.name, {}),
                 **kwargs,
             }
         )
