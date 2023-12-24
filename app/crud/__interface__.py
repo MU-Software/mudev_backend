@@ -58,14 +58,14 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
         return session.scalar(query)
 
     @typing.overload
-    def get(self, session: db_types.Ss, uuid: str | uuid.UUID) -> M | None:
+    def get(self, session: db_types.Ss, uuid: uuid.UUID) -> M | None:
         ...
 
     @typing.overload
-    def get(self, session: db_types.As, uuid: str | uuid.UUID) -> typing.Awaitable[M | None]:  # type: ignore[misc]
+    def get(self, session: db_types.As, uuid: uuid.UUID) -> typing.Awaitable[M | None]:  # type: ignore[misc]
         ...
 
-    def get(self, session: db_types.Ps, uuid: str | uuid.UUID) -> (M | None) | typing.Awaitable[M | None]:
+    def get(self, session: db_types.Ps, uuid: uuid.UUID) -> (M | None) | typing.Awaitable[M | None]:
         return session.scalar(sa.select(self.model).where(self.model.uuid == uuid))
 
     @typing.overload
@@ -103,12 +103,15 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
         nulled_columns: set[str] = {k for k, v in sa_util.orm2dict(db_obj).items() if v is None}
         not_nullable_columns: set[str] = {c.name for c in sa_util.get_not_nullable_columns(self.model)}
         if nn_failed_columns := not_nullable_columns & nulled_columns:
-            errors = [
-                error_const.ErrorStruct.value_error(msg="This field is required", field_name=column_name)
-                for column_name in nn_failed_columns
-            ]
-            raise error_const.errorstruct_to_validationerror(errors)
-
+            error_const.ErrorStruct.raise_multiple(
+                [
+                    error_const.DBValueError.DB_NOT_NULL_CONSTRAINT_ERROR(
+                        loc=["body", column_name],
+                        input=getattr(obj_in, column_name),
+                    )
+                    for column_name in nn_failed_columns
+                ]
+            )
         session.add(db_obj)
 
         if session._is_asyncio:
@@ -158,33 +161,33 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
         return db_obj
 
     @typing.overload
-    def delete(self, session: db_types.Ss, uuid: str | uuid.UUID) -> sa.ScalarResult[M]:
+    def delete(self, session: db_types.Ss, uuid: uuid.UUID) -> sa.ScalarResult[M]:
         ...
 
     @typing.overload
     def delete(  # type: ignore[misc]
-        self, session: db_types.As, uuid: str | uuid.UUID
+        self, session: db_types.As, uuid: uuid.UUID
     ) -> typing.Awaitable[sa.ScalarResult[M]]:
         ...
 
     def delete(
-        self, session: db_types.Ps, uuid: str | uuid.UUID
+        self, session: db_types.Ps, uuid: uuid.UUID
     ) -> sa.ScalarResult[M] | typing.Awaitable[sa.ScalarResult[M]]:
         return session.execute(
             sa.update(self.model).where(self.model.uuid == uuid).values(deleted_at=sa.func.now()).returning(self.model)
         )
 
     @typing.overload
-    def hard_delete(self, session: db_types.Ss, uuid: str | uuid.UUID) -> sa.ScalarResult[M]:
+    def hard_delete(self, session: db_types.Ss, uuid: uuid.UUID) -> sa.ScalarResult[M]:
         ...
 
     @typing.overload
     def hard_delete(  # type: ignore[misc]
-        self, session: db_types.As, uuid: str | uuid.UUID
+        self, session: db_types.As, uuid: uuid.UUID
     ) -> typing.Awaitable[sa.ScalarResult[M]]:
         ...
 
     def hard_delete(
-        self, session: db_types.Ps, uuid: str | uuid.UUID
+        self, session: db_types.Ps, uuid: uuid.UUID
     ) -> sa.ScalarResult[M] | typing.Awaitable[sa.ScalarResult[M]]:
         return session.execute(sa.delete(self.model).where(self.model.uuid == uuid).returning(self.model))

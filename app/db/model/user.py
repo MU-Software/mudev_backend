@@ -85,7 +85,7 @@ class User(db_mixin.DefaultModelMixin):
     @property
     def signin_disabled_reason_message(self) -> str | None:
         if reason := self.signin_disabled_reason:
-            return reason.format(self.dict)
+            return reason.format(**self.dict)
 
         return None
 

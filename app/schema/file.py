@@ -59,7 +59,7 @@ class FileMetadataDTO(pydantic.BaseModel):
     cache_control: list[ResponseCacheControlType] = ["no-cache"]
 
     model_config = pydantic.ConfigDict(
-        alias_generator=mu_string.to_train_case,
+        alias_generator=mu_string.snake_to_train_case,
         arbitrary_types_allowed=True,
         from_attributes=True,
     )

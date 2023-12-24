@@ -36,7 +36,7 @@ async def list_user_file_infos(
 
 @router.get(path="/{file_id}/info/", response_model=file_schema.FileInfoDTO)
 async def get_file_info(
-    file_id: str | uuid.UUID,
+    file_id: uuid.UUID,
     db_session: common_dep.dbDI,
     access_token: authn_dep.access_token_or_none_di,
 ) -> file_model.File:
@@ -46,7 +46,7 @@ async def get_file_info(
 
 @router.head(path="/{file_id}/")
 async def get_file_metadata(
-    file_id: str | uuid.UUID,
+    file_id: uuid.UUID,
     db_session: common_dep.dbDI,
     access_token: authn_dep.access_token_or_none_di,
 ) -> fastapi.responses.Response:
@@ -58,7 +58,7 @@ async def get_file_metadata(
 
 @router.get(path="/{file_id}/")
 async def get_file_binary(
-    file_id: str | uuid.UUID,
+    file_id: uuid.UUID,
     db_session: common_dep.dbDI,
     access_token: authn_dep.access_token_or_none_di,
 ) -> fastapi.responses.FileResponse:
@@ -74,7 +74,7 @@ async def get_file_binary(
 
 @router.get(path="/{file_id}/download/")
 async def download_file_binary(
-    file_id: str | uuid.UUID,
+    file_id: uuid.UUID,
     db_session: common_dep.dbDI,
     access_token: authn_dep.access_token_or_none_di,
 ) -> fastapi.responses.FileResponse:

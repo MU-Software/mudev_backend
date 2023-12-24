@@ -4,6 +4,7 @@ import contextlib
 import email.utils
 import enum
 import functools
+import re
 import string
 import typing
 import unicodedata
@@ -49,7 +50,17 @@ def is_email(s: str) -> bool:
     return False
 
 
-def to_train_case(snake: str) -> str:
+# ---------- Case modifier ----------
+def camel_to_snake_case(camel: str) -> str:
+    camel = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", camel)
+    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", camel).lower()
+
+
+def snake_to_camel_case(snake: str) -> str:
+    return "".join(word.title() for word in snake.split("_"))
+
+
+def snake_to_train_case(snake: str) -> str:
     """Convert a snake_case string to Train-Case.
 
     Args:

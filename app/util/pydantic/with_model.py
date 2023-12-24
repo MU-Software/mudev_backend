@@ -15,7 +15,7 @@ class WithSAModelMixin(pydantic.BaseModel, typing.Generic[T]):
     __allowed_data_fields__: set[str] = set()
 
     @classmethod
-    def model_validate_with_orm(cls: type[CLS_T], *, orm_obj: T, data: dict) -> CLS_T:
+    def model_validate_with_orm(cls: type[CLS_T], orm_obj: T, data: dict) -> CLS_T:
         if forbidden_data_field := data.keys() - cls.__allowed_data_fields__:
             raise ValueError(f"허용되지 않는 필드가 입력되었습니다: [{', '.join(forbidden_data_field)}]")
 

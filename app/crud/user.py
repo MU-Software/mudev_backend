@@ -1,5 +1,4 @@
 import contextlib
-import typing
 import uuid
 
 import argon2
@@ -14,6 +13,7 @@ import app.db.__type__ as db_types
 import app.db.model.user as user_model
 import app.redis.key_type as redis_keytype
 import app.schema.user as user_schema
+import app.util.mu_string as string_util
 import app.util.time_util as time_util
 
 
@@ -30,31 +30,19 @@ class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, 
             return system_user
         return self.create(session=session, obj_in=user_schema.UserCreate.for_system_user())
 
-    async def signin(
-        self,
-        session: db_types.As,
-        *,
-        column: db_types.ColumnableType,
-        user_ident: str,
-        password: str,
-    ) -> user_model.User:
+    async def signin(self, session: db_types.As, user_ident: str, password: str) -> user_model.User:
+        if user_ident.startswith("@"):
+            column, user_ident = user_model.User.username, user_ident[1:]
+        elif "@" in user_ident and string_util.is_email(user_ident):
+            column, user_ident = user_model.User.email, user_ident
+        column, user_ident = user_model.User.username, user_ident
+
         stmt = sa.select(self.model).where(column == user_ident)
 
-        error: error_const.ErrorStruct | None = None
         if not (user := await session.scalar(stmt)):
-            error = error_const.ErrorStruct.value_error(
-                msg="계정을 찾을 수 없어요, 이메일 또는 아이디를 확인해주세요!",
-                field_name="username",
-                input=user_ident,
-            )
-        elif signin_disabled_reason_msg := user.signin_disabled_reason_message:
-            error = error_const.ErrorStruct.value_error(
-                msg=signin_disabled_reason_msg,
-                field_name="username",
-                input=user_ident,
-            )
-        if error:
-            raise error_const.errorstruct_to_validationerror(errors=[error])
+            error_const.AuthError.SIGNIN_USER_NOT_FOUND().raise_()
+        elif error_msg := user.signin_disabled_reason_message:
+            error_const.AuthError.SIGNIN_FAILED(msg=error_msg, input=user_ident).raise_()
 
         with contextlib.suppress(argon2.exceptions.VerifyMismatchError):
             argon2.PasswordHasher().verify(user.password, password)
@@ -66,15 +54,13 @@ class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, 
 
         default_err_msg = user_model.SignInDisabledReason.WRONG_PASSWORD.value.format(**user.dict)
         error_msg = user.signin_disabled_reason_message or default_err_msg
-        error = error_const.ErrorStruct.value_error(msg=error_msg, field_name="password")
-        raise error_const.errorstruct_to_validationerror(errors=[error])
+        error_const.AuthError.SIGNIN_FAILED(msg=error_msg, input=user_ident).raise_()
 
     async def update_password(
-        self, session: db_types.As, *, uuid: str | uuid.UUID, obj_in: user_schema.UserPasswordUpdate
+        self, session: db_types.As, uuid: uuid.UUID, obj_in: user_schema.UserPasswordUpdate
     ) -> user_model.User:
-        user: user_model.User = await self.get(session=session, uuid=uuid)
-        if not user:
-            raise ValueError("계정을 찾을 수 없습니다!")
+        if not (user := await self.get(session=session, uuid=uuid)):
+            error_const.AuthError.AUTH_USER_NOT_FOUND().raise_()
 
         user.set_password(
             user_schema.UserPasswordUpdateForModel.model_validate_with_orm(
@@ -92,49 +78,39 @@ class UserSignInHistoryCRUD(
         user_schema.UserSignInHistoryUpdate,
     ]
 ):
-    def delete(self, *args: tuple, **kwargs: dict) -> typing.NoReturn:  # type: ignore[override]
-        err_msg = "UserSignInHistoryCRUD.delete is not implemented. Use UserSignInHistoryCRUD.revoke instead."
-        raise NotImplementedError(err_msg)
-
-    async def get_using_token_obj(
-        self, session: db_types.As, *, token_obj: user_schema.UserJWTToken
-    ) -> user_model.UserSignInHistory:
-        if not (db_obj := await self.get(session=session, uuid=token_obj.jti)):
-            raise ValueError("로그인 기록을 찾을 수 없습니다!")
-        return db_obj
-
-    async def signin(
-        self, session: db_types.As, *, obj_in: user_schema.UserSignInHistoryCreate
-    ) -> user_schema.RefreshToken:
-        db_obj = await self.create(session=session, obj_in=obj_in)
-        return user_schema.RefreshToken.from_orm(signin_history=db_obj, config_obj=obj_in.config_obj)
-
-    async def refresh(
-        self,
-        session: db_types.As,
-        *,
-        token_obj: user_schema.RefreshToken,
-    ) -> user_schema.RefreshToken:
-        if token_obj.should_refresh:
-            db_obj = await self.get_using_token_obj(session=session, token_obj=token_obj)
-            new_expires_at = time_util.get_utcnow() + jwt_const.UserJWTTokenType.refresh.value.expiration_delta
-            token_obj.exp = db_obj.expires_at = new_expires_at
-            await session.commit()
-        return token_obj
-
-    async def revoke(
-        self,
-        session: db_types.As,
-        redis_session: redis.Redis,
-        *,
-        token_obj: user_schema.UserJWTToken,
+    async def delete(  # type: ignore[override]
+        self, session: db_types.As, redis_session: redis.Redis, token: user_schema.UserJWTToken
     ) -> None:
-        db_obj = await self.get_using_token_obj(session=session, token_obj=token_obj)
+        if not (db_obj := await self.get_using_token_obj(session=session, token=token)):
+            error_const.AuthError.AUTH_HISTORY_NOT_FOUND().raise_()
         db_obj.deleted_at = db_obj.expires_at = sa.func.now()
         await session.commit()
 
-        redis_key = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(token_obj.user))
+        redis_key = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(token.user))
         redis_session.set(redis_key, "1", ex=jwt_const.UserJWTTokenType.refresh.value.expiration_delta)
+
+    async def get_using_token_obj(
+        self, session: db_types.As, token: user_schema.UserJWTToken
+    ) -> user_model.UserSignInHistory:
+        if not (db_obj := await self.get(session=session, uuid=token.jti)):
+            error_const.AuthError.AUTH_HISTORY_NOT_FOUND().raise_()
+        return db_obj
+
+    async def signin(
+        self, session: db_types.As, obj_in: user_schema.UserSignInHistoryCreate
+    ) -> user_schema.RefreshToken:
+        db_obj = await self.create(session=session, obj_in=obj_in)
+        await session.refresh(db_obj)
+        return user_schema.RefreshToken.from_orm(signin_history=db_obj, config_obj=obj_in.config_obj)
+
+    async def refresh(self, session: db_types.As, token: user_schema.RefreshToken) -> user_schema.RefreshToken:
+        if token.should_refresh:
+            if not (db_obj := await self.get_using_token_obj(session=session, token=token)):
+                error_const.AuthError.AUTH_HISTORY_NOT_FOUND().raise_()
+            new_expires_at = time_util.get_utcnow() + jwt_const.UserJWTTokenType.refresh.value.expiration_delta
+            token.exp = db_obj.expires_at = new_expires_at
+            await session.commit()
+        return token
 
 
 userCRUD = UserCRUD(model=user_model.User)

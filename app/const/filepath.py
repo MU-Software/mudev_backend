@@ -18,8 +18,8 @@ class FileUploadTo:
     def current_timestamp(self) -> int:
         return int(time_util.get_utcnow().timestamp())
 
-    def user_file(self, user_uuid: str | uuid.UUID, file_name: str) -> pt.Path:
-        return self.assure_dir(self.base_path / "user" / str(user_uuid))
+    def user_file(self, user_uuid: uuid.UUID, file_name: str) -> pt.Path:
+        return self.assure_dir(self.base_path / "user" / str(user_uuid)) / file_name
 
     def youtube_video_dir(self, youtube_vid: str) -> pt.Path:
         return self.assure_dir(self.base_path / "youtube" / youtube_vid)

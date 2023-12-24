@@ -31,7 +31,7 @@ oauth2_password_scheme = fastapi.security.OAuth2PasswordBearer(
 TokenType = typing.TypeVar("TokenType", bound=user_schema.UserJWTToken)
 
 
-def check_token_revocation(redis_session: redis.Redis, jti: str | uuid.UUID) -> None:
+def check_token_revocation(redis_session: redis.Redis, jti: uuid.UUID) -> None:
     redis_key: str = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(jti))
     if redis_session.get(name=redis_key):
         raise jwt.exceptions.InvalidTokenError("Token is revoked")

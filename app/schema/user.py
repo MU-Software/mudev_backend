@@ -215,7 +215,7 @@ class UserJWTToken(pydantic.BaseModel):
 
     @classmethod
     def from_token(
-        cls, *, token: str, key: str, request_user_agent: str, config_obj: fastapi_config.FastAPISetting
+        cls, token: str, key: str, request_user_agent: str, config_obj: fastapi_config.FastAPISetting
     ) -> UserJWTToken:
         return cls(
             **jwt.decode(jwt=token, key=key, algorithms=["HS256"]),
@@ -280,7 +280,7 @@ class RefreshToken(UserJWTToken):
 
     @classmethod
     def from_orm(
-        cls, *, signin_history: user_model.UserSignInHistory, config_obj: fastapi_config.FastAPISetting
+        cls, signin_history: user_model.UserSignInHistory, config_obj: fastapi_config.FastAPISetting
     ) -> RefreshToken:
         return cls(
             iss=config_obj.server_name,

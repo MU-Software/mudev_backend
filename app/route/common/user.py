@@ -9,6 +9,7 @@ import fastapi.security
 import sqlalchemy as sa
 
 import app.const.cookie as cookie_const
+import app.const.error as error_const
 import app.const.tag as tag_const
 import app.crud.user as user_crud
 import app.db.model.user as user_model
@@ -17,7 +18,6 @@ import app.dependency.common as common_dep
 import app.dependency.header as header_dep
 import app.schema.user as user_schema
 import app.util.fastapi.cookie as cookie_util
-import app.util.mu_string as mu_string
 
 router = fastapi.APIRouter(tags=[tag_const.OpenAPITag.USER], prefix="/user")
 
@@ -52,16 +52,10 @@ async def signin(
     user_ip: header_dep.user_ip,
     user_agent: header_dep.user_agent,
     csrf_token: header_dep.csrf_token,
-    form_data: typing.Annotated[fastapi.security.OAuth2PasswordRequestForm, fastapi.Depends()],
+    payload: typing.Annotated[fastapi.security.OAuth2PasswordRequestForm, fastapi.Depends()],
     response: fastapi.Response,
 ) -> dict:
-    if form_data.username.startswith("@"):
-        column, username = user_model.User.username, form_data.username[1:]
-    elif "@" in form_data.username and mu_string.is_email(form_data.username):
-        column, username = user_model.User.email, form_data.username
-    column, username = user_model.User.username, form_data.username
-
-    user = await user_crud.userCRUD.signin(db_session, column=column, user_ident=username, password=form_data.password)
+    user = await user_crud.userCRUD.signin(db_session, user_ident=payload.username, password=payload.password)
     await db_session.refresh(user)  # TODO: Remove this
 
     refresh_token_obj = await user_crud.userSignInHistoryCRUD.signin(
@@ -90,10 +84,10 @@ async def signout(
         kwargs = {**config_obj.to_cookie_config(), **cookie_key.to_cookie_config()}
         cookie_util.Cookie.model_validate(kwargs).delete_cookie(response)
 
-    await user_crud.userSignInHistoryCRUD.revoke(
+    await user_crud.userSignInHistoryCRUD.delete(
         session=db_session,
         redis_session=redis_session,
-        token_obj=access_token,
+        token=access_token,
     )
 
     response.status_code = 204
@@ -107,7 +101,7 @@ async def refresh(
     refresh_token: authn_dep.refresh_token_di,
     response: fastapi.Response,
 ) -> dict:
-    refresh_token = await user_crud.userSignInHistoryCRUD.refresh(session=db_session, token_obj=refresh_token)
+    refresh_token = await user_crud.userSignInHistoryCRUD.refresh(session=db_session, token=refresh_token)
     refresh_token.set_cookie(response)
     return {"access_token": refresh_token.to_access_token(csrf_token=csrf_token).jwt, "token_type": "bearer"}
 
@@ -172,17 +166,15 @@ async def revoke_signin_history(
     db_session: common_dep.dbDI,
     redis_session: common_dep.redisDI,
     access_token: authn_dep.access_token_di,
-    usih_uuid: str,
+    usih_uuid: uuid.UUID,
     response: fastapi.Response,
 ) -> None:
-    # TODO: 403 응답을 문서화하기
-    if str(access_token.jti) == usih_uuid:
-        error_msg = "현재 로그인 중인 기기를 로그아웃하시려면, 로그아웃 기능을 사용해주세요."
-        raise fastapi.HTTPException(status_code=403, detail=error_msg)
+    if access_token.jti == usih_uuid:
+        error_const.AuthError.SELF_REVOKE_NOT_ALLOWED().raise_()
 
-    await user_crud.userSignInHistoryCRUD.revoke(
+    await user_crud.userSignInHistoryCRUD.delete(
         session=db_session,
         redis_session=redis_session,
-        token_obj=access_token,
+        token=access_token,
     )
     response.status_code = 204
