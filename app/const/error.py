@@ -112,7 +112,7 @@ class DBValueError(ErrorEnum):
 
 
 class AuthError(ErrorEnum):
-    __default_args__ = {"status_code": fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY, "should_log": False}
+    __default_args__ = {"status_code": fastapi.status.HTTP_401_UNAUTHORIZED, "should_log": False}
     __additional_args__ = {
         "INVALID_ACCESS_TOKEN": ErrorStructDict(loc=["header", "authorization"]),
         "INVALID_REFRESH_TOKEN": ErrorStructDict(loc=["cookie", "refresh_token"]),
