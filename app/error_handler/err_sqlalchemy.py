@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 
-import fastapi.responses
 import psycopg.errors as pg_exc
 import sqlalchemy.exc as sa_exc
 
@@ -31,58 +30,45 @@ def error_to_nckey(msg_primary: str) -> tuple[db_mixin.NCKey | None, re.Match | 
 async def psycopg_dataerror_handler(req: err_type.ReqType, err: pg_exc.DataError) -> err_type.RespType:
     # TODO: FIXME: THis sould be handled by CRUDBase or CRUDView.
     # [print(attr, getattr(err.diag, attr)) for attr in dir(err.diag) if not attr.startswith("_")]
-    status_code = fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY
-    content = {"detail": error_const.DBValueError.DB_DATA_ERROR().model_dump()}
-    return fastapi.responses.JSONResponse(status_code=status_code, content=content)
+    return error_const.DBValueError.DB_DATA_ERROR().response()
 
 
 async def psycopg_integrityerror_handler(req: err_type.ReqType, err: pg_exc.IntegrityError) -> err_type.RespType:
     # TODO: FIXME: THis sould be handled by CRUDBase or CRUDView.
     match err:
         case pg_exc.IntegrityConstraintViolation():
-            parsed_error = error_const.DBServerError.DB_INTEGRITY_CONSTRAINT_ERROR()
+            return error_const.DBServerError.DB_INTEGRITY_CONSTRAINT_ERROR().response()
         case pg_exc.RestrictViolation():
-            parsed_error = error_const.DBValueError.DB_RESTRICT_CONSTRAINT_ERROR()
+            return error_const.DBValueError.DB_RESTRICT_CONSTRAINT_ERROR().response()
         case pg_exc.NotNullViolation():
-            parsed_error = error_const.DBValueError.DB_NOT_NULL_CONSTRAINT_ERROR()
+            return error_const.DBValueError.DB_NOT_NULL_CONSTRAINT_ERROR().response()
         case pg_exc.ForeignKeyViolation():
             parsed_error = error_const.DBValueError.DB_NOT_NULL_CONSTRAINT_ERROR()
             err_msg = parsed_error.msg.format(referred_table_name=err.diag.table_name or "")
-            parsed_error = parsed_error(msg=err_msg)
+            return parsed_error(msg=err_msg).response()
         case pg_exc.UniqueViolation():
-            parsed_error = error_const.DBValueError.DB_UNIQUE_CONSTRAINT_ERROR()
+            return error_const.DBValueError.DB_UNIQUE_CONSTRAINT_ERROR().response()
         case pg_exc.CheckViolation():
-            parsed_error = error_const.DBValueError.DB_CHECK_CONSTRAINT_ERROR()
+            return error_const.DBValueError.DB_CHECK_CONSTRAINT_ERROR().response()
         case pg_exc.ExclusionViolation():
-            parsed_error = error_const.DBValueError.DB_EXCLUSION_CONSTRAINT_ERROR()
+            return error_const.DBValueError.DB_EXCLUSION_CONSTRAINT_ERROR().response()
         case _:
             nc_key, _ = error_to_nckey(err.diag.message_primary)
-            parsed_error = IntegrityErrorMsgMap.get(nc_key, error_const.DBServerError.DB_UNKNOWN_ERROR())
-
-    status_code = fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY
-    content = {"detail": parsed_error.model_dump()}
-    return fastapi.responses.JSONResponse(status_code=status_code, content=content)
+            return IntegrityErrorMsgMap.get(nc_key, error_const.DBServerError.DB_UNKNOWN_ERROR())
 
 
 async def psycopg_databaseerror_handler(req: err_type.ReqType, err: pg_exc.DatabaseError) -> err_type.RespType:
     if handler_func := error_handler_patterns.get(type(err)):
         return await handler_func(req, err)
-
-    status_code = fastapi.status.HTTP_500_INTERNAL_SERVER_ERROR
-    content = {"detail": error_const.DBServerError.DB_UNKNOWN_ERROR().model_dump()}
-    return fastapi.responses.JSONResponse(status_code=status_code, content=content)
+    return error_const.DBServerError.DB_UNKNOWN_ERROR().response()
 
 
 async def psycopg_connectionerror_handler(req: err_type.ReqType, err: pg_exc.Error) -> err_type.RespType:
-    status_code = fastapi.status.HTTP_500_INTERNAL_SERVER_ERROR
-    content = {"detail": error_const.DBServerError.DB_CONNECTION_ERROR().model_dump()}
-    return fastapi.responses.JSONResponse(status_code=status_code, content=content)
+    return error_const.DBServerError.DB_CONNECTION_ERROR().response()
 
 
 async def psycopg_criticalerror_handler(req: err_type.ReqType, err: pg_exc.Error) -> err_type.RespType:
-    status_code = fastapi.status.HTTP_500_INTERNAL_SERVER_ERROR
-    content = {"detail": error_const.DBServerError.DB_CRITICAL_ERROR().model_dump()}
-    return fastapi.responses.JSONResponse(status_code=status_code, content=content)
+    return error_const.DBServerError.DB_CRITICAL_ERROR().response()
 
 
 async def sqlalchemy_error_handler(req: err_type.ReqType, err: sa_exc.SQLAlchemyError) -> err_type.RespType:
@@ -91,10 +77,7 @@ async def sqlalchemy_error_handler(req: err_type.ReqType, err: sa_exc.SQLAlchemy
         for orig_err_type in type(orig_exception).__mro__:
             if handler_func := error_handler_patterns.get(orig_err_type):
                 return await handler_func(req, orig_exception)
-
-    status_code = fastapi.status.HTTP_500_INTERNAL_SERVER_ERROR
-    content = [error_const.DBServerError.DB_UNKNOWN_ERROR().model_dump()]
-    return fastapi.responses.JSONResponse(status_code=status_code, content=content)
+    return error_const.DBServerError.DB_UNKNOWN_ERROR().response()
 
 
 error_handler_patterns = {

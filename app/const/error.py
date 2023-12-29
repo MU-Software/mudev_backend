@@ -13,11 +13,6 @@ import app.util.mu_string as string_util
 logger = logging.getLogger(__name__)
 
 
-class CommonErrorMsg:
-    UNKNOWN_SERVER_ERROR = "알 수 없는 문제가 발생했습니다, 5분 후에 다시 시도해주세요."
-    CRITICAL_SERVER_ERROR = "서버에 치명적인 문제가 발생했습니다, 관리자에게 문의해주시면 감사하겠습니다."
-
-
 class ErrorStructDict(typing.TypedDict):
     type: typing.NotRequired[str]
     msg: typing.NotRequired[str]
@@ -68,6 +63,10 @@ class ErrorStruct(pydantic.BaseModel):
             raise fastapi.exceptions.RequestValidationError(errors=errors)
         raise fastapi.exceptions.HTTPException(status_code=status_code, detail=[e.dump() for e in errors])
 
+    def response(self) -> fastapi.responses.JSONResponse:
+        content = {"detail": self.dump()}
+        return fastapi.responses.JSONResponse(status_code=self.status_code, content=content)
+
 
 class ErrorEnumMixin:
     __default_args__: dict[str, typing.Any] = {}
@@ -88,6 +87,13 @@ class ErrorEnum(ErrorEnumMixin, enum.StrEnum):
                 **kwargs,
             }
         )
+
+
+class ServerError(ErrorEnum):
+    __default_args__ = {"status_code": fastapi.status.HTTP_500_INTERNAL_SERVER_ERROR, "should_log": True}
+
+    UNKNOWN_SERVER_ERROR = "알 수 없는 문제가 발생했습니다, 5분 후에 다시 시도해주세요."
+    CRITICAL_SERVER_ERROR = "서버에 치명적인 문제가 발생했습니다, 관리자에게 문의해주시면 감사하겠습니다."
 
 
 class DBServerError(ErrorEnum):
