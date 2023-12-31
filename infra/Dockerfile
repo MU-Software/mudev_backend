@@ -46,6 +46,7 @@ ARG INVALIDATE_CACHE_DATE=unknown
 RUN echo INVALIDATE_CACHE_DATE
 
 # Copy main app
+COPY ../alembic.ini ./alembic.ini
 COPY ../pyproject.toml ./pyproject.toml
 COPY ../app/ /app
 RUN mkdir -p user_content
