@@ -14,7 +14,7 @@ class DummyResponse(pydantic.BaseModel):
     message: typing.Literal["ok"] = "ok"
 
 
-@router.get("", response_model=DummyResponse)
+@router.post("", response_model=DummyResponse)
 async def ssco_telegram_webhook(request: fastapi.requests.Request) -> dict[str, str]:
     logger.warning("request.headers")
     logger.warning(request.headers)
