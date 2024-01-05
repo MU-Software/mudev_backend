@@ -13,5 +13,6 @@ class OpenAPITag(enum.StrEnum):
     USER = enum.auto()
     USER_FILE = enum.auto()
     USER_SIGNIN_HISTORY = enum.auto()
+    WEBHOOK = enum.auto()
 
     YTDL = "YouTube Downloader"
