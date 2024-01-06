@@ -201,7 +201,10 @@ class SNSAuthInfo(pydantic.BaseModel):
     client_token: str
 
     def to_token(self, key: str) -> str:
-        return jwt.encode(payload=self.model_dump(include={"user_agent", "client_token"}), key=key, algorithm="HS256")
+        payload = self.model_dump(include={"user_agent", "client_token"}) | {
+            "exp": int(jwt_const.UserJWTTokenType.sns_auth_info.get_exp_from_now().timestamp()),
+        }
+        return jwt.encode(payload=payload, key=key, algorithm="HS256")
 
     @pydantic.field_serializer("user_agent")
     def serialize_user_agent(self, user_agent: SNSAuthInfoUserAgentEnum) -> str:

@@ -82,6 +82,7 @@ class FastAPISetting(pydantic_settings.BaseSettings):
     port: int
     root_path: str = ""
 
+    frontend_name: str = "localhost"
     server_name: str = "localhost"
     restapi_version: str = "v1"
     secret_key: pydantic.SecretStr = pydantic.SecretStr(secrets.token_hex(16))

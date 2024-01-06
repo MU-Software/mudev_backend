@@ -29,7 +29,7 @@ async def start(
     user_uuid: uuid.UUID | None,
 ) -> None:
     await update.effective_message.reply_text(
-        "본 봇을 사용하기 위해서는 먼저 mudev.cc의 계정과 연동을 해야합니다.\n/auth 을 누르거나 입력하셔서 인증을 진행해주세요."
+        "본 봇은 먼저 mudev.cc의 계정과 연동한 후 사용하실 수 있습니다.\n/auth 을 누르거나 입력하셔서 인증을 진행해주세요."
     )
 
 
@@ -50,17 +50,10 @@ async def auth_user(
     sns_type = user_schema.SNSAuthInfoUserAgentEnum.telegram.name
     sns_info = user_schema.SNSAuthInfo(user_agent=sns_type, client_token=telegram_user.id)
     key = config_obj.secret_key.get_secret_value()
+    url = config_obj.frontend_name + "/user/sns?sns_token=" + sns_info.to_token(key)
     await update.effective_message.reply_text(
-        text="mudev.cc의 계정과 연동을 위해 아래 링크를 클릭해주세요.",
-        reply_markup=telegram.InlineKeyboardMarkup(
-            [
-                [
-                    telegram.InlineKeyboardButton(
-                        text="mudev.cc 인증", url=str(request.base_url) + "/user/sns?sns_token=" + sns_info.to_token(key)
-                    )
-                ],
-            ],
-        ),
+        text="아래 버튼을 눌러 mudev.cc 계정 연동을 진행해주세요.",
+        reply_markup=telegram.InlineKeyboardMarkup([[telegram.InlineKeyboardButton(text="mudev.cc 인증", url=url)]]),
     )
 
 
