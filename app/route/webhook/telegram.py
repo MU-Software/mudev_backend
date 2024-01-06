@@ -50,7 +50,18 @@ async def auth_user(
     sns_type = user_schema.SNSAuthInfoUserAgentEnum.telegram.name
     sns_info = user_schema.SNSAuthInfo(user_agent=sns_type, client_token=telegram_user.id)
     key = config_obj.secret_key.get_secret_value()
-    request.base_url + "/user/sns?sns_token=" + sns_info.to_token(key)
+    await update.effective_message.reply_text(
+        text="mudev.cc의 계정과 연동을 위해 아래 링크를 클릭해주세요.",
+        reply_markup=telegram.InlineKeyboardMarkup(
+            [
+                [
+                    telegram.InlineKeyboardButton(
+                        text="mudev.cc 인증", url=request.base_url + "/user/sns?sns_token=" + sns_info.to_token(key)
+                    )
+                ],
+            ],
+        ),
+    )
 
 
 async def create_ytdl_task(
