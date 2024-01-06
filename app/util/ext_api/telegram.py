@@ -46,7 +46,7 @@ CmdHandlerMapType = dict[re.Pattern | str, CommandHandler]
 
 
 def add_help_command(cmds: CmdHandlerMapType) -> CmdHandlerMapType:
-    def send_help_message(
+    async def send_help_message(
         request: fastapi.Request,
         update: telegram.Update,
         config_obj: fastapi_config.FastAPISetting,
@@ -55,7 +55,7 @@ def add_help_command(cmds: CmdHandlerMapType) -> CmdHandlerMapType:
         user_uuid: uuid.UUID | None,
     ) -> None:
         help_text = "\n".join(f"{h.title}[{h.pattern}] : {h.description}" for h in cmds.values() if h.show_in_help)
-        update.effective_message.reply_text(text=help_text)
+        await update.effective_message.reply_text(text=help_text)
 
     cmd_helper = CommandHandler(
         pattern="/help",
@@ -102,7 +102,7 @@ def register_telegram_webhook_handler(*, router: fastapi.APIRouter, route: str =
             raise fastapi.HTTPException(status_code=400, detail="읽은 메시지를 이해할 수 없어요.")
 
         if not ((msg_obj := payload.effective_message) and (msg_str := msg_obj.text)):
-            bot.send_message(chat_id=msg_obj.chat_id, text="메시지를 읽었지만, 할 수 있는 일이 적혀있지 않았어요.")
+            await bot.send_message(chat_id=msg_obj.chat_id, text="메시지를 읽었지만, 할 수 있는 일이 적혀있지 않았어요.")
             raise fastapi.HTTPException(status_code=400, detail="메시지를 읽었지만, 할 수 있는 일이 적혀있지 않았어요.")
 
         msg_str = string_util.normalize(msg_str).strip()
@@ -125,5 +125,5 @@ def register_telegram_webhook_handler(*, router: fastapi.APIRouter, route: str =
                 await handler.handler(request, payload, config_obj, db_session, redis_session, user_uuid)
                 return {"message": "ok"}
 
-        payload.effective_message.reply_text("무슨 말씀이신지 이해하지 못했어요, 다시 입력해주세요.")
+        await payload.effective_message.reply_text("무슨 말씀이신지 이해하지 못했어요, 다시 입력해주세요.")
         return {"message": "ok"}

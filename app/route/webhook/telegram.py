@@ -28,7 +28,9 @@ async def start(
     redis_session: redis.Redis,
     user_uuid: uuid.UUID | None,
 ) -> None:
-    update.effective_message.reply_text("본 봇을 사용하기 위해서는 먼저 mudev.cc의 계정과 연동을 해야합니다.\n/auth 을 누르거나 입력하셔서 인증을 진행해주세요.")
+    await update.effective_message.reply_text(
+        "본 봇을 사용하기 위해서는 먼저 mudev.cc의 계정과 연동을 해야합니다.\n/auth 을 누르거나 입력하셔서 인증을 진행해주세요."
+    )
 
 
 async def auth_user(
@@ -40,7 +42,7 @@ async def auth_user(
     user_uuid: uuid.UUID | None,
 ) -> None:
     if user_uuid:
-        update.effective_message.reply_text("이미 연동된 계정이 있습니다.")
+        await update.effective_message.reply_text("이미 연동된 계정이 있습니다.")
         raise fastapi.HTTPException(status_code=409, detail="이미 연동된 계정이 있습니다.")
     if not (telegram_user := update.effective_user):
         raise fastapi.HTTPException(status_code=422, detail="유저 정보를 얻을 수 없었습니다.")
