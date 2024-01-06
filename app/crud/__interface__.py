@@ -191,3 +191,7 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
         self, session: db_types.Ps, uuid: uuid.UUID
     ) -> sa.ScalarResult[M] | typing.Awaitable[sa.ScalarResult[M]]:
         return session.execute(sa.delete(self.model).where(self.model.uuid == uuid).returning(self.model))
+
+
+class EmptySchema(pydantic.BaseModel):
+    ...

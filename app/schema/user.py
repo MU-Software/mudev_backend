@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import enum
 import typing
 import uuid
 
@@ -177,6 +178,7 @@ class UserSignInHistoryCreate(pydantic.BaseModel):
     ip: pydantic.IPvAnyAddress
     user_agent: str
     config_obj: fastapi_config.FastAPISetting = pydantic.Field(exclude=True)
+    client_token: str | None = None
 
     @pydantic.field_serializer("ip", when_used="always")
     def serialize_ip(self, v: pydantic.IPvAnyAddress) -> str:
@@ -189,8 +191,53 @@ class UserSignInHistoryCreate(pydantic.BaseModel):
         return time_util.get_utcnow() + jwt_const.UserJWTTokenType.refresh.value.expiration_delta
 
 
-class UserSignInHistoryUpdate(pydantic.BaseModel):
-    ...
+class SNSAuthInfoUserAgentEnum(enum.StrEnum):
+    telegram = enum.auto()
+    kakao = enum.auto()
+
+
+class SNSAuthInfo(pydantic.BaseModel):
+    user_agent: SNSAuthInfoUserAgentEnum
+    client_token: str
+
+    def to_token(self, key: str) -> str:
+        return jwt.encode(payload=self.model_dump(include={"user_agent", "client_token"}), key=key, algorithm="HS256")
+
+    @pydantic.field_serializer("user_agent")
+    def serialize_user_agent(self, user_agent: SNSAuthInfoUserAgentEnum) -> str:
+        return user_agent.name
+
+    @pydantic.field_validator("client_token", mode="before")
+    @classmethod
+    def validate_client_token(cls, value: int | str) -> str:
+        return str(value)
+
+
+class SNSAuthInfoCreate(UserSignInHistoryCreate, SNSAuthInfo, pydantic.BaseModel):  # type: ignore[misc]
+    @classmethod
+    def from_token(
+        cls, user_uuid: uuid.UUID, ip: str, config_obj: fastapi_config.FastAPISetting, token: str
+    ) -> SNSAuthInfoCreate:
+        try:
+            return cls(
+                user_uuid=user_uuid,
+                ip=ip,
+                config_obj=config_obj,
+                **jwt.decode(token, config_obj.secret_key.get_secret_value(), algorithms=["HS256"]),
+            )
+        except jwt.exceptions.ExpiredSignatureError:
+            raise fastapi.HTTPException(status_code=422, detail="인증 시간이 경과했어요.")
+        except jwt.exceptions.InvalidTokenError:
+            raise fastapi.HTTPException(status_code=400, detail="인증 정보가 유효하지 않아요.")
+        except pydantic.ValidationError as e:
+            raise e
+        except Exception:
+            raise fastapi.HTTPException(status_code=400, detail="유효하지 않은 인증 정보에요.")
+
+    @pydantic.computed_field  # type: ignore[misc]
+    @property
+    def expires_at(self) -> datetime.datetime:
+        return datetime.datetime.max
 
 
 class UserJWTToken(pydantic.BaseModel):

@@ -1,35 +1,30 @@
 import logging
-import typing
 
 import fastapi
-import pydantic
 import sqlalchemy as sa
 
 import app.const.tag as tag_const
 import app.dependency.common as common_dep
 import app.dependency.header as header_dep
+import app.util.fastapi as fastapi_util
 
 logger = logging.getLogger(__name__)
 router = fastapi.APIRouter(tags=[tag_const.OpenAPITag.HEALTH_CHECK])
 
 
-class HealthCheckResponse(pydantic.BaseModel):
-    message: typing.Literal["ok"] = "ok"
-
-
-class ReadyzResponse(HealthCheckResponse):
+class ReadyzResponse(fastapi_util.EmptyResponseSchema):
     debug: bool
     database: bool
     cache: bool
 
 
-class AccessInfoResponse(HealthCheckResponse):
+class AccessInfoResponse(fastapi_util.EmptyResponseSchema):
     user_agent: str
     user_ip: str
 
 
-@router.get("/healthz", response_model=HealthCheckResponse, deprecated=True)
-@router.get("/livez", response_model=HealthCheckResponse)
+@router.get("/healthz", response_model=fastapi_util.EmptyResponseSchema, deprecated=True)
+@router.get("/livez", response_model=fastapi_util.EmptyResponseSchema)
 async def livez() -> dict[str, str]:
     return {"message": "ok"}
 

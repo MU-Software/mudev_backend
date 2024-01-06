@@ -17,6 +17,7 @@ import app.dependency.authn as authn_dep
 import app.dependency.common as common_dep
 import app.dependency.header as header_dep
 import app.schema.user as user_schema
+import app.util.fastapi as fastapi_util
 import app.util.fastapi.cookie as cookie_util
 
 router = fastapi.APIRouter(tags=[tag_const.OpenAPITag.USER], prefix="/user")
@@ -178,3 +179,21 @@ async def revoke_signin_history(
         token=access_token,
     )
     response.status_code = 204
+
+
+@router.post(path="/sns/", response_model=fastapi_util.EmptyResponseSchema)
+async def register_sns_auth(
+    db_session: common_dep.dbDI,
+    config_obj: common_dep.settingDI,
+    user_ip: header_dep.user_ip,
+    access_token: authn_dep.access_token_di,
+    sns_token: str,
+) -> dict:
+    obj_in = user_schema.SNSAuthInfoCreate.from_token(
+        user_uuid=access_token.user,
+        ip=user_ip,
+        config_obj=config_obj,
+        token=sns_token,
+    )
+    await user_crud.snsAuthInfoCRUD.create(session=db_session, obj_in=obj_in)
+    return {"message": "ok"}

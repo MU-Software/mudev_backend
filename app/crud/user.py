@@ -75,7 +75,7 @@ class UserSignInHistoryCRUD(
     crud_interface.CRUDBase[
         user_model.UserSignInHistory,
         user_schema.UserSignInHistoryCreate,
-        user_schema.UserSignInHistoryUpdate,
+        crud_interface.EmptySchema,
     ]
 ):
     async def delete(  # type: ignore[override]
@@ -113,5 +113,22 @@ class UserSignInHistoryCRUD(
         return token
 
 
+class SNSAuthInfoCRUD(
+    crud_interface.CRUDBase[
+        user_model.UserSignInHistory,
+        user_schema.SNSAuthInfoCreate,
+        crud_interface.EmptySchema,
+    ]
+):
+    async def sns_user_to_user(self, session: db_types.As, sns_type: str, user_id: int | None) -> uuid.UUID | None:
+        if not user_id:
+            return None
+
+        stmt = sa.select(self.model)
+        stmt = stmt.where(self.model.user_agent == sns_type, self.model.client_token == str(user_id))
+        return auth.user_uuid if (auth := await self.get_using_query(session=session, query=stmt)) else None
+
+
 userCRUD = UserCRUD(model=user_model.User)
 userSignInHistoryCRUD = UserSignInHistoryCRUD(model=user_model.UserSignInHistory)
+snsAuthInfoCRUD = SNSAuthInfoCRUD(model=user_model.UserSignInHistory)

@@ -36,6 +36,17 @@ class ErrorStruct(pydantic.BaseModel):
     status_code: int = pydantic.Field(default=fastapi.status.HTTP_500_INTERNAL_SERVER_ERROR, exclude=True)
     should_log: bool = pydantic.Field(default=True, exclude=True)
 
+    @classmethod
+    def from_exception(cls, err: Exception) -> ErrorStruct:
+        return cls(
+            type=string_util.camel_to_snake_case(err.__class__.__name__),
+            msg=str(err),
+            loc=getattr(err, "loc", None),
+            input=getattr(err, "input", None),
+            ctx=getattr(err, "ctx", None),
+            url=getattr(err, "url", None),
+        )
+
     def __call__(self, **kwargs: tx.Unpack[ErrorStructDict]) -> ErrorStruct:
         return self.model_copy(**kwargs)
 
