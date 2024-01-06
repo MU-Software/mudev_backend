@@ -56,7 +56,7 @@ async def auth_user(
             [
                 [
                     telegram.InlineKeyboardButton(
-                        text="mudev.cc 인증", url=request.base_url + "/user/sns?sns_token=" + sns_info.to_token(key)
+                        text="mudev.cc 인증", url=str(request.base_url) + "/user/sns?sns_token=" + sns_info.to_token(key)
                     )
                 ],
             ],
