@@ -18,7 +18,7 @@ alembic = {extras = ["tz"], version = "^1.12.0"}
 python-dotenv = "^1.0.0"
 eventlet = "^0.33.3"
 celery = {extras = ["redis", "sqlalchemy", "tblib"], version = "^5.3.6"}
-gitpython = "^3.1.37"
+gitpython = "^3.1.41"
 aiohttp = "^3.9.0"
 yt-dlp = "^2023.11.14"
 pillow = "^10.0.1"
