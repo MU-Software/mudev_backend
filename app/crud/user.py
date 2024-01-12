@@ -114,18 +114,18 @@ class UserSignInHistoryCRUD(
 
 
 class SNSAuthInfoCRUD(
-    crud_interface.CRUDBase[
-        user_model.UserSignInHistory,
-        user_schema.SNSAuthInfoCreate,
-        crud_interface.EmptySchema,
-    ]
+    crud_interface.CRUDBase[user_model.UserSignInHistory, user_schema.SNSAuthInfoCreate, crud_interface.EmptySchema]
 ):
     async def sns_user_to_user(self, session: db_types.As, sns_type: str, user_id: int | None) -> uuid.UUID | None:
         if not user_id:
             return None
 
-        stmt = sa.select(self.model)
-        stmt = stmt.where(self.model.user_agent == sns_type, self.model.client_token == str(user_id))
+        stmt = sa.select(self.model).where(
+            self.model.user_agent == sns_type,
+            self.model.client_token == str(user_id),
+            # 삭제되지 않았거나 만료되지 않은 토큰만 사용
+            sa.or_(self.model.deleted_at.is_(None), self.model.expires_at > sa.func.now()),
+        )
         return auth.user_uuid if (auth := await self.get_using_query(session=session, query=stmt)) else None
 
 
