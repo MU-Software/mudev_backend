@@ -42,6 +42,7 @@ typing-extensions = "^4.9.0"
 python-multipart = "^0.0.6"
 aiofiles = "^23.2.1"
 python-telegram-bot = "^20.7"
+paramiko = "^3.4.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.6.0"
