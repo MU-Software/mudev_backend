@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 config_obj = fastapi_config.get_fastapi_setting()
 
 
-def reset_db() -> None:
+def reset_db(do_not_create: bool = False) -> None:
     if not config_obj.debug:
         raise Exception("This command can only be used in debug mode.")
 
@@ -21,13 +21,14 @@ def reset_db() -> None:
             db_module.db_mixin.DefaultModelMixin.metadata.drop_all(bind=db.engine, checkfirst=True)
             logger.warning("All tables dropped.")
 
-            # Create all tables
-            db_module.db_mixin.DefaultModelMixin.metadata.create_all(bind=db.engine, checkfirst=True)
-            logger.warning("All tables created.")
+            if not do_not_create:
+                # Create all tables
+                db_module.db_mixin.DefaultModelMixin.metadata.create_all(bind=db.engine, checkfirst=True)
+                logger.warning("All tables created.")
 
-            # Create system user
-            user_crud.userCRUD.get_system_user(session=session)
-            logger.warning("System user created.")
+                # Create system user
+                user_crud.userCRUD.get_system_user(session=session)
+                logger.warning("System user created.")
 
             session.commit()
 
