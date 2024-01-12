@@ -24,7 +24,7 @@ def ytdl_updater_task(self: celery_interface.SessionTask[None]) -> None:
         task_model.Task.startable.is_(True),
         task_model.Task.state != celery_const.CeleryTaskStatus.SUCCESS,
     )
-    with self.db_session as session:
+    with self.sync_db.get_sync_session() as session:
         while bool(session.execute(stmt).scalar_one_or_none()):
             time.sleep(5)
 
@@ -45,6 +45,6 @@ def ytdl_updater_task(self: celery_interface.SessionTask[None]) -> None:
         task_model.Task.startable.is_(False),
         task_model.Task.state != celery_const.CeleryTaskStatus.SUCCESS,
     )
-    with self.db_session as session:
+    with self.sync_db.get_sync_session() as session:
         session.execute(stmt)
         session.commit()

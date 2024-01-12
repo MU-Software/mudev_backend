@@ -37,7 +37,7 @@ def raise_if_task_not_runnable(task: celery_interface.SessionTask) -> None:
         "max_retries": task.max_retries + 1 if task.max_retries is not None else 1,
         "throw": True,
     }
-    if not task.task_instance.startable:
+    if not task.startable:
         raise task.retry(**retry_kwargs, exc=RuntimeError("Task is not startable"))
 
     import app.celery_task.task.ytdl_updater as ytdl_updater
@@ -48,10 +48,9 @@ def raise_if_task_not_runnable(task: celery_interface.SessionTask) -> None:
         task_model.Task.startable.is_(True),
         task_model.Task.state != celery_const.CeleryTaskStatus.SUCCESS,
     )
-    with task.db_session as session:
+    with task.sync_db.get_sync_session() as session:
         if bool(session.execute(stmt).scalar_one_or_none()):
-            task.task_instance.startable = False
-            session.commit()
+            task.update_task_row(startable=False)
             raise task.retry(**retry_kwargs, exc=RuntimeError("Updater is running"))
 
 
@@ -89,7 +88,7 @@ def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, video_id: 
     audio_paths = convert_video_to_m4a_and_mp3(file_paths["video"], file_paths["thumbnail"])
     file_paths |= audio_paths
 
-    with self.db_session as session:
+    with self.sync_db.get_sync_session() as session:
         system_user = user_crud.userCRUD.get_system_user(session)
         file_records: dict[str, file_model.File] = {
             file_type: file_crud.fileCRUD.create(
