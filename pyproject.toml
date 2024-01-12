@@ -9,52 +9,52 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.11"
 fastapi = "^0.103.1"
-pydantic = "^2.3.0"
-redis = {version = "^5.0.0", extras = ["hiredis"]}
-SQLAlchemy = {extras = ["greenlet"], version = "^2.0.23"}
+pydantic = "^2.5.3"
+redis = {version = "^5.0.1", extras = ["hiredis"]}
+SQLAlchemy = {extras = ["greenlet"], version = "^2.0.25"}
 uvicorn = "^0.25.0"
 gunicorn = "^21.2.0"
-alembic = {extras = ["tz"], version = "^1.12.0"}
+alembic = {extras = ["tz"], version = "^1.13.1"}
 python-dotenv = "^1.0.0"
 eventlet = "^0.33.3"
 celery = {extras = ["redis", "sqlalchemy", "tblib"], version = "^5.3.6"}
-gitpython = "^3.1.37"
-aiohttp = "^3.9.0"
-yt-dlp = "^2023.11.14"
-pillow = "^10.0.1"
+gitpython = "^3.1.41"
+aiohttp = "^3.9.1"
+yt-dlp = "^2023.12.30"
+pillow = "^10.2.0"
 mutagen = "^1.47.0"
-google-api-python-client = "^2.110.0"
+google-api-python-client = "^2.113.0"
 ffmpeg-python = "^0.2.0"
-pydantic-settings = "^2.0.3"
+pydantic-settings = "^2.1.0"
 passlib = "^1.7.4"
 argon2-cffi = "^23.1.0"
-psycopg = {extras = ["binary"], version = "^3.1.14"}
+psycopg = {extras = ["binary"], version = "^3.1.17"}
 typer = "^0.9.0"
 python-dateutil = "^2.8.2"
 flower = "^2.0.1"
-ipython = "^8.18.1"
+ipython = "^8.20.0"
 fabric = "^3.2.2"
 toml = "^0.10.2"
 email-validator = "^2.1.0.post1"
 pyjwt = "^2.8.0"
 user-agents = "^2.2.0"
-typing-extensions = "^4.8.0"
+typing-extensions = "^4.9.0"
 python-multipart = "^0.0.6"
 aiofiles = "^23.2.1"
 python-telegram-bot = "^20.7"
 
 [tool.poetry.group.dev.dependencies]
-pre-commit = "^3.4.0"
-pylint = "^2.17.5"
+pre-commit = "^3.6.0"
+pylint = "^2.17.7"
 flake8 = "^6.1.0"
-mypy = "^1.5.1"
-black = "^23.9.1"
-bandit = "^1.7.5"
-isort = "^5.12.0"
-refurb = "^1.25.0"
-flake8-noqa = "^1.3.2"
-flake8-bugbear = "^23.9.16"
-types-redis = "^4.6.0.7"
+mypy = "^1.8.0"
+black = "^23.12.1"
+bandit = "^1.7.6"
+isort = "^5.13.2"
+refurb = "^1.27.0"
+flake8-noqa = "^1.4.0"
+flake8-bugbear = "^23.12.2"
+types-redis = "^4.6.0.20240106"
 
 [build-system]
 requires = ["poetry-core"]
