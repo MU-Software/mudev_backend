@@ -61,10 +61,15 @@ def run_cmd_on_host(cmd: list[str]) -> tuple[str, str]:
     paramiko_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # nosec B507
     paramiko_client.connect("host.docker.internal", username=username, pkey=pkey)
 
-    _, stdout, stderr = paramiko_client.exec_command(" ".join(cmd))  # nosec B601
+    ssh_stdin, ssh_stdout, ssh_stderr = paramiko_client.exec_command(" ".join(cmd))  # nosec B601
+    ssh_stdin.close()
+
+    stdout = "".join(ssh_stdout.readlines())
+    stderr = "".join(ssh_stderr.readlines())
+
     paramiko_client.close()
 
-    return stdout.read().decode(), stderr.read().decode()
+    return stdout, stderr
 
 
 def resolve_container_path_to_host(docker_path: pt.Path) -> pt.Path:
