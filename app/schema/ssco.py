@@ -13,7 +13,7 @@ class VideoDTO(pydantic.BaseModel):
     youtube_vid: str
     title: str
     thumbnail_uuid: uuid.UUID
-    data: pydantic.Json | None = None
+    data: pydantic.Json | dict | None = None
 
 
 class VideoDownloadRequestPayload(pydantic.BaseModel):
@@ -49,10 +49,6 @@ class VideoUpdate(pydantic.BaseModel):
     title: str
     thumbnail_uuid: uuid.UUID
     data: pydantic.Json | None = None
-
-    @pydantic.field_serializer("data")
-    def serialize_data(self, v: pydantic.Json | None) -> str | None:
-        return json.loads(v) if v else None
 
 
 class PlaylistCreate(pydantic.BaseModel):
