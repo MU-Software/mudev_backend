@@ -44,7 +44,13 @@ class SessionTask(celery.Task, typing.Generic[T]):
         super().__init__(*args, **kwargs)
         self.config_obj = celery_config.get_celery_setting()
         self.sync_db = db_module.SyncDB(config_obj=self.config_obj)
+        self.sync_db.open()
         self.sync_redis = redis_module.SyncRedis(config_obj=self.config_obj)
+        self.sync_redis.open()
+
+    def __del__(self) -> None:
+        self.sync_db.close()
+        self.sync_redis.close()
 
     @property
     def task_id(self) -> str | None:
