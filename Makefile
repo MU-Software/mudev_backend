@@ -25,7 +25,7 @@ ifeq (docker-build,$(firstword $(MAKECMDGOALS)))
   IMAGE_NAME := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
   $(eval $(IMAGE_NAME):;@:)
 endif
-IMAGE_NAME := $(if $(IMAGE_NAME),$(IMAGE_NAME),snowfall_image)
+IMAGE_NAME := $(if $(IMAGE_NAME),$(IMAGE_NAME),mudev-backend)
 
 ifeq ($(DOCKER_DEBUG),true)
 	DOCKER_MID_BUILD_OPTIONS = --progress=plain --no-cache

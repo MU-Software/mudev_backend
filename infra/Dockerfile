@@ -2,9 +2,9 @@ FROM --platform=linux/arm64 python:3.11-slim-bookworm as base
 
 # ==============================================================================
 FROM base as builder
+SHELL [ "/bin/bash", "-euxvc"]
 
-RUN set -eux; \
-    apt-get update; \
+RUN apt-get update; \
     apt-get install  -y --no-install-recommends curl openssh-client gcc git libpq-dev; \
     curl -sSL https://install.python-poetry.org | python3.11 -;
 
@@ -12,13 +12,13 @@ ENV PATH="${PATH}:/root/.local/bin:"
 
 COPY ../poetry.lock ../pyproject.toml ./
 
-RUN set -eux; \
-    poetry config experimental.system-git-client true; \
+RUN poetry config experimental.system-git-client true; \
     poetry config virtualenvs.create false; \
     poetry install --only main --no-interaction --no-ansi --no-root;
 
 # ==============================================================================
 FROM base as runtime
+SHELL [ "/bin/bash", "-euxvc"]
 
 ARG GIT_HASH
 ENV TZ=Asia/Seoul \
@@ -27,8 +27,7 @@ ENV TZ=Asia/Seoul \
     PYTHONIOENCODING=UTF-8 \
     DEPLOYMENT_GIT_HASH=$GIT_HASH
 
-RUN set -eux; \
-    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone; \
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone; \
     apt-get update; \
     apt-get install -y --no-install-recommends curl wget ca-certificates gnupg lsb-release;
 

@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eux
+
+docker build \
+	-t $IMAGE_NAME \
+	-f Dockerfile \
+	--target runtime \
+	--build-arg GIT_HASH="$(git rev-parse HEAD)" \
+	--build-arg INVALIDATE_CACHE_DATE="$(date +%Y-%m-%d_%H:%M:%S)" \
+	../
