@@ -60,7 +60,7 @@ class SyncDB(DB, type_util.SyncConnectedResource):
         # Create DB engine and session pool.
         config = self.config_obj.sqlalchemy.to_sqlalchemy_config()
         self.engine = sa.engine_from_config(configuration=config, prefix="")
-        self.session_maker = sa_orm.session.sessionmaker(self.engine)
+        self.session_maker = sa_orm.session.sessionmaker(self.engine, autoflush=False, expire_on_commit=False)
 
         with self.session_maker() as session:
             self.check_connection(session)
