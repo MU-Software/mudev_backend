@@ -67,9 +67,9 @@ async def create_ytdl_task(
 ) -> None:
     if not (message := update.effective_message):
         raise fastapi.HTTPException(status_code=422, detail="메시지에서 정보를 얻을 수 없었습니다.")
-
     if not (youtube_id := youtube_util.extract_vid_from_url(message.text)):
-        raise fastapi.HTTPException(status_code=422, detail="유효한 유튜브 URL이 아닙니다.")
+        await update.effective_message.reply_text(text="유효한 YouTube URL이 아니에요.")
+        return None
 
     video_create_obj = ssco_schema.VideoCreate(youtube_vid=youtube_id)
     video_record, created = await ssco_crud.videoCRUD.get_or_create_async(db_session, video_create_obj)
@@ -78,7 +78,7 @@ async def create_ytdl_task(
     await db_session.commit()
 
     if created:
-        ytdl_task.ytdl_downloader_task.delay(video_id=youtube_id)
+        ytdl_task.ytdl_downloader_task.delay(youtube_vid=youtube_id)
 
 
 telegram_util.register_telegram_webhook_handler(

@@ -64,6 +64,7 @@ repos:
           - types-toml
           - types-aiofiles
           - types-requests
+          - types-paramiko
 -   repo: https://github.com/dosisod/refurb
     rev: v1.27.0
     hooks:

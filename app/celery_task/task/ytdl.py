@@ -17,6 +17,7 @@ import app.db.model.ssco as ssco_model
 import app.db.model.task as task_model
 import app.schema.file as file_schema
 import app.schema.ssco as ssco_schema
+import app.util.ext_api.docker as docker_util
 import app.util.ext_api.youtube as youtube_util
 
 logger = logging.getLogger(__name__)
@@ -54,38 +55,54 @@ def raise_if_task_not_runnable(task: celery_interface.SessionTask) -> None:
             raise task.retry(**retry_kwargs, exc=RuntimeError("Updater is running"))
 
 
-def convert_video_to_m4a_and_mp3(video_path: pt.Path, coverart_path: pt.Path) -> dict[str, pt.Path]:
-    """ffmpeg를 이용해 영상 파일을 m4a와 mp3 파일로 변환"""
-    mp3_path = video_path.with_suffix(".mp3")
-    m4a_path = video_path.with_suffix(".m4a")
+def run_ffmpeg_for_video_to_m4a_and_mp3(video_path: pt.Path, coverart_path: pt.Path) -> dict[str, pt.Path]:
+    """ffmpeg를 이용해 영상 파일을 m4a와 mp3 파일로 변환하는 명령어를 생성합니다."""
+    target_video_path = video_path
+    target_coverart_path = coverart_path
+    if docker_util.is_container():
+        target_video_path = docker_util.resolve_container_path_to_host(video_path)
+        target_coverart_path = docker_util.resolve_container_path_to_host(coverart_path)
+    target_mp3_path = target_video_path.with_suffix(".mp3")
+    target_m4a_path = target_video_path.with_suffix(".m4a")
 
-    original_file_node = ffmpeg.input(video_path)
+    original_file_node = ffmpeg.input(target_video_path)
     audio_node = original_file_node.audio.filter("silenceremove", "1", "0", "-50dB").filter_multi_output("asplit")
-    m4a_output_node = audio_node.stream(1).output(m4a_path.as_posix())
+    m4a_output_node = audio_node.stream(1).output(target_m4a_path.as_posix())
     mp3_output_node = (
         audio_node.stream(0)
-        .output(ffmpeg.input(coverart_path), mp3_path.as_posix())
+        .output(ffmpeg.input(target_coverart_path), target_mp3_path.as_posix())
         .global_args("-disposition:0", "attached_pic")
         .global_args("-id3v2_version", "3")
     )
-    ffmpeg.merge_outputs(mp3_output_node, m4a_output_node).run(overwrite_output=True)
+    merged_node: ffmpeg.nodes.Node = ffmpeg.merge_outputs(mp3_output_node, m4a_output_node)
 
-    return {"mp3": mp3_path, "m4a": m4a_path}
+    if docker_util.is_container():
+        compiled_args: list[str] = ffmpeg.compile(merged_node, overwrite_output=True)
+        stdout, stderr = docker_util.run_cmd_on_host(compiled_args)
+        logger.debug(f"ffmpeg stdout:\n{stdout}")
+        logger.debug(f"ffmpeg stderr:\n{stderr}")
+    else:
+        ffmpeg_run: tuple[str, str] = ffmpeg.run(merged_node, overwrite_output=True, quiet=True)
+        stdout, stderr = ffmpeg_run
+        logger.debug(f"ffmpeg stdout:\n{stdout}")
+        logger.debug(f"ffmpeg stderr:\n{stderr}")
+
+    return {ext: video_path.with_suffix(ext) for ext in ["mp3", "m4a"]}
 
 
 @celery.shared_task(bind=True, base=celery_interface.SessionTask)
-def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, video_id: str) -> None:
+def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, youtube_vid: str) -> None:
     """youtube-dl을 이용해 비디오를 다운로드하고, Video와 File row를 생성합니다."""
     raise_if_task_not_runnable(self)
 
-    save_dir = self.config_obj.project.upload_to.youtube_video_dir(video_id)
-    download_info = youtube_util.download_video(video_id, save_dir)
+    save_dir = self.config_obj.project.upload_to.youtube_video_dir(youtube_vid)
+    download_info = youtube_util.download_video(youtube_vid, save_dir)
 
     file_paths: dict[str, pt.Path] = {}
     file_paths["video"] = download_info.file_path
-    file_paths["thumbnail"] = youtube_util.download_thumbnail(video_id, save_dir)
+    file_paths["thumbnail"] = youtube_util.download_thumbnail(youtube_vid, save_dir)
 
-    audio_paths = convert_video_to_m4a_and_mp3(file_paths["video"], file_paths["thumbnail"])
+    audio_paths = run_ffmpeg_for_video_to_m4a_and_mp3(file_paths["video"], file_paths["thumbnail"])
     file_paths |= audio_paths
 
     with self.sync_db.get_sync_session() as session:
@@ -103,7 +120,7 @@ def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, video_id: 
             "thumbnail_uuid": file_records["thumbnail"].uuid,
             "data": download_info.dumped_json,
         }
-        video_stmt = sa.select(ssco_model.Video).where(ssco_model.Video.youtube_vid == video_id)
+        video_stmt = sa.select(ssco_model.Video).where(ssco_model.Video.youtube_vid == youtube_vid)
         assert (video_record := ssco_crud.videoCRUD.get_using_query(session, video_stmt))  # nosec B101
         video_record = ssco_crud.videoCRUD.update(
             session,

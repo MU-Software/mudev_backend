@@ -43,5 +43,5 @@ async def create_video_download_task(
     await db_session.commit()
 
     if created:
-        ytdl_task.ytdl_downloader_task.delay(video_id=payload.youtube_vid)
+        ytdl_task.ytdl_downloader_task.delay(youtube_vid=payload.youtube_vid)
     return None

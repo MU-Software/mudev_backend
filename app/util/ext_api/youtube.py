@@ -77,8 +77,7 @@ def download_thumbnail(video_id: str, save_dir: pt.Path) -> pt.Path:
 
 
 def get_video_ids_from_playlist_id(playlist_id: str, google_api_key: str) -> set[str]:
-    youtube_client = google_api_discovery.build("youtube", "v3", developerKey=google_api_key)
-    playlist_items_api = youtube_client.playlistItems()
+    playlist_items_api = google_api_discovery.build("youtube", "v3", developerKey=google_api_key).playlistItems()
     video_ids: set[str] = set()
     page_token: str | None = None
 
