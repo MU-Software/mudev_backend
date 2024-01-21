@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import pathlib as pt
 import time
@@ -91,7 +92,7 @@ def run_ffmpeg_for_video_to_m4a_and_mp3(video_path: pt.Path, coverart_path: pt.P
         logger.debug(f"ffmpeg stdout:\n{stdout}")
         logger.debug(f"ffmpeg stderr:\n{stderr}")
 
-    return {ext: video_path.with_suffix(ext) for ext in ["mp3", "m4a"]}
+    return {ext: video_path.with_suffix(f".{ext}") for ext in ["mp3", "m4a"]}
 
 
 @celery.shared_task(bind=True, base=celery_interface.SessionTask)
@@ -123,7 +124,7 @@ def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, youtube_vi
         video_obj_kwargs = {
             "title": download_info.title,
             "thumbnail_uuid": file_records["thumbnail"].uuid,
-            "data": download_info.dumped_json,
+            "data": json.dumps(download_info.data),
         }
         video_stmt = sa.select(ssco_model.Video).where(ssco_model.Video.youtube_vid == youtube_vid)
         assert (video_record := ssco_crud.videoCRUD.get_using_query(session, video_stmt))  # nosec B101
