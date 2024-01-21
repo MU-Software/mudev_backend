@@ -1,14 +1,18 @@
+import asyncio
 import logging
 import pathlib as pt
+import time
 import typing
 import uuid
 
 import celery
 import ffmpeg
 import sqlalchemy as sa
+import telegram
 
 import app.celery_task.__interface__ as celery_interface
 import app.const.celery as celery_const
+import app.const.sns as sns_const
 import app.crud.file as file_crud
 import app.crud.ssco as ssco_crud
 import app.crud.user as user_crud
@@ -104,6 +108,7 @@ def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, youtube_vi
 
     audio_paths = run_ffmpeg_for_video_to_m4a_and_mp3(file_paths["video"], file_paths["thumbnail"])
     file_paths |= audio_paths
+    file_download_urls: dict[str, str] = {}
 
     with self.sync_db.get_sync_session() as session:
         system_user = user_crud.userCRUD.get_system_user(session)
@@ -132,3 +137,41 @@ def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, youtube_vi
             video_record.files.add(file_record)
 
         session.commit()
+
+        for row in file_records.values():
+            session.refresh(row)
+            ext = typing.cast(pt.Path, row.path).suffix.replace(".", "")
+            base_url = self.config_obj.project.user_content_base_url
+            file_download_urls[ext] = f"{base_url}file/{row.uuid}/download/"
+
+    # 완료 후, 요청한 유저에게 알림을 보냅니다.
+    # route에서 등록하는 중에 알림을 보내는 일을 방지하기 위해, 3초 후에 알림을 보내도록 합니다.
+    time.sleep(3)
+
+    telegram_bot_token = self.config_obj.project.ssco.telegram_bot_token.get_secret_value()
+    telegram_bot = telegram.Bot(token=telegram_bot_token)
+    telegram_button = telegram.InlineKeyboardMarkup(
+        [
+            [telegram.InlineKeyboardButton(text=f"{ext.upper()} 파일 다운로드", url=url)]
+            for ext, url in file_download_urls.items()
+        ]
+    )
+
+    chat_ids: set[int] = set()
+    with self.sync_db.get_sync_session() as session:
+        video_record = ssco_crud.videoCRUD.get_using_query(session, video_stmt)
+        for user in video_record.users:
+            # TODO: 아직은 유저가 텔레그램 연동을 해야만 알림을 보낼 수 있습니다.
+            target_sns = sns_const.SNSAuthInfoUserAgentEnum.telegram
+            clients = user_crud.snsAuthInfoCRUD.get_user_sns_tokens(session, user.uuid, target_sns)
+            chat_ids |= {c.chat_id for c in clients if c.chat_id}
+
+    message_tasks = [
+        telegram_bot.send_message(
+            chat_id=c,
+            text=f"영상이 준비됐어요!\n{video_record.title}",
+            reply_markup=telegram_button,
+        )
+        for c in chat_ids
+    ]
+    asyncio.get_event_loop().run_until_complete(asyncio.gather(*message_tasks))

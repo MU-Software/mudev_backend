@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import enum
 import typing
 import uuid
 
@@ -14,6 +13,7 @@ import sqlalchemy as sa
 
 import app.config.fastapi as fastapi_config
 import app.const.jwt as jwt_const
+import app.const.sns as sns_const
 import app.const.system as system_const
 import app.db.model.user as user_model
 import app.util.fastapi.cookie as cookie_util
@@ -191,29 +191,33 @@ class UserSignInHistoryCreate(pydantic.BaseModel):
         return time_util.get_utcnow() + jwt_const.UserJWTTokenType.refresh.value.expiration_delta
 
 
-class SNSAuthInfoUserAgentEnum(enum.StrEnum):
-    telegram = enum.auto()
-    kakao = enum.auto()
+class SNSClientInfo(pydantic.BaseModel):
+    sns_type: sns_const.SNSAuthInfoUserAgentEnum
+    user_id: int  # User ID
+    chat_id: int  # Chat ID
 
 
 class SNSAuthInfo(pydantic.BaseModel):
-    user_agent: SNSAuthInfoUserAgentEnum
-    client_token: str
+    user_agent: sns_const.SNSAuthInfoUserAgentEnum
+    client_token: SNSClientInfo
 
     def to_token(self, key: str) -> str:
-        payload = self.model_dump(include={"user_agent", "client_token"}) | {
-            "exp": int(jwt_const.UserJWTTokenType.sns_auth_info.get_exp_from_now().timestamp()),
-        }
+        exp = int(jwt_const.UserJWTTokenType.sns_auth_info.get_exp_from_now().timestamp())
+        payload = self.model_dump(include={"user_agent", "client_token"}) | {"exp": exp}
         return jwt.encode(payload=payload, key=key, algorithm="HS256")
 
     @pydantic.field_serializer("user_agent")
-    def serialize_user_agent(self, user_agent: SNSAuthInfoUserAgentEnum) -> str:
-        return user_agent.name
+    def serialize_user_agent(self, user_agent: sns_const.SNSAuthInfoUserAgentEnum) -> str:
+        return user_agent.value
 
     @pydantic.field_validator("client_token", mode="before")
     @classmethod
-    def validate_client_token(cls, value: int | str) -> str:
-        return str(value)
+    def validate_client_token(cls, value: str | SNSClientInfo) -> SNSClientInfo:
+        return value if isinstance(value, SNSClientInfo) else SNSClientInfo.model_validate_json(value)
+
+    @pydantic.field_serializer("client_token")
+    def serialize_client_token(self, client_token: SNSClientInfo) -> str:
+        return client_token.model_dump_json()
 
 
 class SNSAuthInfoCreate(UserSignInHistoryCreate, SNSAuthInfo, pydantic.BaseModel):  # type: ignore[misc]
@@ -229,13 +233,13 @@ class SNSAuthInfoCreate(UserSignInHistoryCreate, SNSAuthInfo, pydantic.BaseModel
                 **jwt.decode(token, config_obj.secret_key.get_secret_value(), algorithms=["HS256"]),
             )
         except jwt.exceptions.ExpiredSignatureError:
-            raise fastapi.HTTPException(status_code=422, detail="인증 시간이 경과했어요.")
+            raise fastapi.HTTPException(status_code=422, detail="SNS 인증 시간이 경과했어요.")
         except jwt.exceptions.InvalidTokenError:
-            raise fastapi.HTTPException(status_code=400, detail="인증 정보가 유효하지 않아요.")
+            raise fastapi.HTTPException(status_code=400, detail="SNS 인증 정보가 유효하지 않아요.")
         except pydantic.ValidationError as e:
             raise e
         except Exception:
-            raise fastapi.HTTPException(status_code=400, detail="유효하지 않은 인증 정보에요.")
+            raise fastapi.HTTPException(status_code=400, detail="유효하지 않은 SNS 인증 정보에요.")
 
     @pydantic.computed_field  # type: ignore[misc]
     @property

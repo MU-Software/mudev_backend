@@ -13,6 +13,7 @@ class SSCoProjectSetting(pydantic_settings.BaseSettings):
 
 class ProjectSetting(pydantic_settings.BaseSettings):
     user_content_dir: pydantic.DirectoryPath
+    user_content_base_url: pydantic.HttpUrl
 
     ssco: SSCoProjectSetting
 

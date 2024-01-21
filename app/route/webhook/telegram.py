@@ -8,6 +8,7 @@ import telegram
 
 import app.celery_task.task.ytdl as ytdl_task
 import app.config.fastapi as fastapi_config
+import app.const.sns as sns_const
 import app.const.tag as tag_const
 import app.crud.ssco as ssco_crud
 import app.crud.user as user_crud
@@ -44,11 +45,16 @@ async def auth_user(
     if user_uuid:
         await update.effective_message.reply_text("이미 연동된 계정이 있습니다.")
         raise fastapi.HTTPException(status_code=409, detail="이미 연동된 계정이 있습니다.")
-    if not (telegram_user := update.effective_user):
+    if not (sns_user := update.effective_user):
         raise fastapi.HTTPException(status_code=422, detail="유저 정보를 얻을 수 없었습니다.")
+    if not (sns_msg := update.effective_message):
+        raise fastapi.HTTPException(status_code=422, detail="메시지에서 정보를 얻을 수 없었습니다.")
+    sns_chat = sns_msg.chat
 
-    sns_type = user_schema.SNSAuthInfoUserAgentEnum.telegram.name
-    sns_info = user_schema.SNSAuthInfo(user_agent=sns_type, client_token=telegram_user.id)
+    sns_type = sns_const.SNSAuthInfoUserAgentEnum.telegram.value
+    sns_token = user_schema.SNSClientInfo(sns_type=sns_type, user_id=sns_user.id, chat_id=sns_chat).model_dump_json()
+    sns_info = user_schema.SNSAuthInfo(user_agent=sns_type, client_token=sns_token)
+
     key = config_obj.secret_key.get_secret_value()
     url = config_obj.frontend_name + "/user/sns?sns_token=" + sns_info.to_token(key)
     await update.effective_message.reply_text(

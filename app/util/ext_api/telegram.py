@@ -13,9 +13,9 @@ import sqlalchemy.ext.asyncio as sa_ext_asyncio
 import telegram
 
 import app.config.fastapi as fastapi_config
+import app.const.sns as sns_const
 import app.crud.user as user_crud
 import app.dependency.common as common_dep
-import app.schema.user as user_schema
 import app.util.fastapi as fastapi_util
 import app.util.mu_string as string_util
 
@@ -114,7 +114,7 @@ def register_telegram_webhook_handler(*, router: fastapi.APIRouter, route: str =
 
                 user_uuid = await user_crud.snsAuthInfoCRUD.sns_user_to_user(
                     db_session,
-                    user_schema.SNSAuthInfoUserAgentEnum.telegram.name,
+                    sns_const.SNSAuthInfoUserAgentEnum.telegram,
                     user.id if user else None,
                 )
 
