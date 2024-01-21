@@ -172,7 +172,7 @@ class YouTubeDLPDownloadResult(pydantic.BaseModel):
 
     @pydantic.computed_field  # type: ignore[misc]
     @functools.cached_property
-    def dumped_json(self) -> dict[str, typing.Any]:
+    def data(self) -> dict[str, typing.Any]:
         return json.loads(self.stdout.splitlines()[0])
 
     @pydantic.computed_field  # type: ignore[misc]
@@ -183,17 +183,17 @@ class YouTubeDLPDownloadResult(pydantic.BaseModel):
     @pydantic.computed_field  # type: ignore[misc]
     @functools.cached_property
     def id(self) -> str:
-        return self.dumped_json["id"]
+        return self.data["id"]
 
     @pydantic.computed_field  # type: ignore[misc]
     @functools.cached_property
     def title(self) -> str:
-        return self.dumped_json["title"]
+        return self.data["title"]
 
     @pydantic.computed_field  # type: ignore[misc]
     @functools.cached_property
     def quality(self) -> str:
-        return self.dumped_json["format"]
+        return self.data["format"]
 
     @pydantic.model_validator(mode="after")
     def validate(self) -> typing.Self:
