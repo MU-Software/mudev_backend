@@ -95,6 +95,11 @@ async def signout(
     return response
 
 
+@router.put(path="/verify/", response_model=fastapi_util.EmptyResponseSchema)
+async def verify(access_token: authn_dep.access_token_di) -> dict:
+    return {"message": "ok"}
+
+
 @router.get(path="/refresh/", response_model=user_schema.UserTokenResponse)
 async def refresh(
     db_session: common_dep.dbDI,
