@@ -36,7 +36,8 @@ class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, 
             column, user_ident = user_model.User.username, user_ident[1:]
         elif "@" in user_ident and string_util.is_email(user_ident):
             column, user_ident = user_model.User.email, user_ident
-        column, user_ident = user_model.User.username, user_ident
+        else:
+            column, user_ident = user_model.User.username, user_ident
 
         stmt = sa.select(self.model).where(column == user_ident)
 
