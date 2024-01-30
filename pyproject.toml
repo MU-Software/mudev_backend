@@ -19,7 +19,7 @@ python-dotenv = "^1.0.0"
 eventlet = "^0.34.3"
 celery = {extras = ["redis", "sqlalchemy", "tblib"], version = "^5.3.6"}
 gitpython = "^3.1.41"
-aiohttp = "^3.9.1"
+aiohttp = "^3.9.2"
 yt-dlp = "^2023.12.30"
 pillow = "^10.2.0"
 mutagen = "^1.47.0"
