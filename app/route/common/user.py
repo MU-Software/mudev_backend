@@ -174,7 +174,7 @@ async def revoke_signin_history(
     response: fastapi.Response,
 ) -> None:
     if access_token.jti == usih_uuid:
-        error_const.AuthError.SELF_REVOKE_NOT_ALLOWED().raise_()
+        error_const.AuthNError.SELF_REVOKE_NOT_ALLOWED().raise_()
 
     await user_crud.userSignInHistoryCRUD.delete(
         session=db_session,

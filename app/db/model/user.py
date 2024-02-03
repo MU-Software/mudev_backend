@@ -21,7 +21,9 @@ SIGNIN_POSSIBLE_AFTER_MAIL_VERIFICATION = config_obj.route.account.signin_possib
 
 class SignInDisabledReason(enum.StrEnum):
     EMAIL_NOT_VERIFIED = "이메일 인증이 완료되지 않았습니다. 이메일을 확인해주세요."
-    WRONG_PASSWORD = "비밀번호가 일치하지 않습니다.\n" "({leftover_signin_failed_attempt}번 더 틀리면 계정이 잠겨요.)"  # nosec B105
+    WRONG_PASSWORD = (
+        "비밀번호가 일치하지 않습니다.\n" "({leftover_signin_failed_attempt}번 더 틀리면 계정이 잠겨요.)"
+    )  # nosec B105
     UNKNOWN = "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해주시고, 문제가 지속되면 관리자에게 문의해주세요."
 
     # LOCKED

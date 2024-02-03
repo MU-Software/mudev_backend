@@ -42,9 +42,9 @@ class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, 
         stmt = sa.select(self.model).where(column == user_ident)
 
         if not (user := await session.scalar(stmt)):
-            error_const.AuthError.SIGNIN_USER_NOT_FOUND().raise_()
+            error_const.AuthNError.SIGNIN_USER_NOT_FOUND().raise_()
         elif error_msg := user.signin_disabled_reason_message:
-            error_const.AuthError.SIGNIN_FAILED(msg=error_msg, input=user_ident).raise_()
+            error_const.AuthNError.SIGNIN_FAILED(msg=error_msg, input=user_ident).raise_()
 
         with contextlib.suppress(argon2.exceptions.VerifyMismatchError):
             argon2.PasswordHasher().verify(user.password, password)
@@ -56,13 +56,13 @@ class UserCRUD(crud_interface.CRUDBase[user_model.User, user_schema.UserCreate, 
 
         default_err_msg = user_model.SignInDisabledReason.WRONG_PASSWORD.value.format(**user.dict)
         error_msg = user.signin_disabled_reason_message or default_err_msg
-        error_const.AuthError.SIGNIN_FAILED(msg=error_msg, input=user_ident).raise_()
+        error_const.AuthNError.SIGNIN_FAILED(msg=error_msg, input=user_ident).raise_()
 
     async def update_password(
         self, session: db_types.As, uuid: uuid.UUID, obj_in: user_schema.UserPasswordUpdate
     ) -> user_model.User:
         if not (user := await self.get(session=session, uuid=uuid)):
-            error_const.AuthError.AUTH_USER_NOT_FOUND().raise_()
+            error_const.AuthNError.AUTH_USER_NOT_FOUND().raise_()
 
         user.set_password(
             user_schema.UserPasswordUpdateForModel.model_validate_with_orm(
@@ -84,7 +84,7 @@ class UserSignInHistoryCRUD(
         self, session: db_types.As, redis_session: redis.Redis, token: user_schema.UserJWTToken
     ) -> None:
         if not (db_obj := await self.get_using_token_obj(session=session, token=token)):
-            error_const.AuthError.AUTH_HISTORY_NOT_FOUND().raise_()
+            error_const.AuthNError.AUTH_HISTORY_NOT_FOUND().raise_()
         db_obj.deleted_at = db_obj.expires_at = sa.func.now()
         await session.commit()
 
@@ -95,7 +95,7 @@ class UserSignInHistoryCRUD(
         self, session: db_types.As, token: user_schema.UserJWTToken
     ) -> user_model.UserSignInHistory:
         if not (db_obj := await self.get(session=session, uuid=token.jti)):
-            error_const.AuthError.AUTH_HISTORY_NOT_FOUND().raise_()
+            error_const.AuthNError.AUTH_HISTORY_NOT_FOUND().raise_()
         return db_obj
 
     async def signin(
@@ -107,7 +107,7 @@ class UserSignInHistoryCRUD(
     async def refresh(self, session: db_types.As, token: user_schema.RefreshToken) -> user_schema.RefreshToken:
         if token.should_refresh:
             if not (db_obj := await self.get_using_token_obj(session=session, token=token)):
-                error_const.AuthError.AUTH_HISTORY_NOT_FOUND().raise_()
+                error_const.AuthNError.AUTH_HISTORY_NOT_FOUND().raise_()
             new_expires_at = time_util.get_utcnow() + jwt_const.UserJWTTokenType.refresh.value.expiration_delta
             token.exp = db_obj.expires_at = new_expires_at
             await session.commit()

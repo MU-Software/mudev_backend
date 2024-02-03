@@ -5,6 +5,7 @@ import fastapi
 import pydantic
 import sqlalchemy as sa
 
+import app.const.error as error_const
 import app.const.tag as tag_const
 import app.crud.file as file_crud
 import app.db.model.file as file_model
@@ -19,9 +20,9 @@ router = fastapi.APIRouter(tags=[tag_const.OpenAPITag.USER_FILE], prefix="/file"
 
 def check_file_permission(file: file_model.File | None, token_obj: user_schema.AccessToken | None) -> file_model.File:
     if not file or file.deleted_at:
-        raise fastapi.HTTPException(status_code=404, detail="File not found")
+        error_const.ClientError.RESOURCE_NOT_FOUND().raise_()
     if file.private and (not token_obj or file.created_by_uuid != token_obj.user):
-        raise fastapi.HTTPException(status_code=403, detail="File is private")
+        error_const.AuthZError.PERMISSION_DENIED().raise_()
     return file
 
 

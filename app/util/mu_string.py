@@ -12,6 +12,8 @@ import unicodedata
 import pydantic
 import user_agents as ua
 
+import app.const.error as error_const
+
 USERNAME_MIN_LEN = 4
 USERNAME_MAX_LEN = 48
 PW_MIN_LEN = 8
@@ -125,15 +127,15 @@ class UserNameValidator(enum.StrEnum):
             case cls.SAFE:
                 return value
             case cls.EMPTY:
-                raise ValueError("ID를 입력해주세요!")
+                error_const.ClientError.USERNAME_REQUIRED().raise_()
             case cls.TOO_SHORT:
-                raise ValueError(f"ID가 너무 짧아요! (최소 {min_len}자 이상으로 설정해주세요)")
+                error_const.ClientError.USERNAME_TOO_SHORT().format_msg(min_len=min_len, max_len=max_len).raise_()
             case cls.TOO_LONG:
-                raise ValueError(f"ID가 너무 길어요! (최대 {max_len}까지 가능해요)")
+                error_const.ClientError.USERNAME_TOO_LONG().format_msg(min_len=min_len, max_len=max_len).raise_()
             case cls.FORBIDDEN_CHAR:
-                raise ValueError("ID에 사용할 수 없는 문자가 있어요!")
+                error_const.ClientError.USERNAME_CONTAINS_INVALID_CHAR().raise_()
             case _:
-                raise ValueError("알 수 없는 오류가 발생했어요! 관리자에게 문의해주세요!")
+                error_const.ServerError.UNKNOWN_SERVER_ERROR().raise_()
 
 
 UsernameField = typing.Annotated[
@@ -187,20 +189,19 @@ class PasswordValidator(enum.StrEnum):
             case cls.SAFE:
                 return value
             case cls.EMPTY:
-                raise ValueError("비밀번호를 입력해주세요!")
+                error_const.ClientError.PASSWORD_REQUIRED().raise_()
             case cls.TOO_SHORT:
-                raise ValueError(f"비밀번호가 너무 짧아요! (최소 {min_len}자 이상으로 설정해주세요)")
+                error_const.ClientError.PASSWORD_TOO_SHORT().format_msg(min_len=min_len, max_len=max_len).raise_()
             case cls.TOO_LONG:
-                raise ValueError("비밀번호가 너무 길어요!\n" f"(최대 {max_len}자까지 가능해요...이렇게 긴 비밀번호는 외우기 힘드시지 않을까요?)")
+                error_const.ClientError.PASSWORD_TOO_LONG().format_msg(max_len=max_len).raise_()
             case cls.NEED_MORE_CHAR_TYPE:
-                raise ValueError(
-                    f"비밀번호에는 {min_char_type_num}가지 이상의 문자 종류가 포함되어야 해요!\n"
-                    f"(영문 대문자, 영문 소문자, 숫자, 특수문자 중 {min_char_type_num}가지 이상을 포함해주세요)"
-                )
+                error_const.ClientError.PASSWORD_NEED_MORE_CHAR_TYPE().format_msg(
+                    min_char_type_num=min_char_type_num
+                ).raise_()
             case cls.FORBIDDEN_CHAR:
-                raise ValueError("비밀번호에 사용할 수 없는 문자가 있어요!")
+                error_const.ClientError.PASSWORD_CONTAINS_INVALID_CHAR().raise_()
             case _:
-                raise ValueError("알 수 없는 오류가 발생했어요! 관리자에게 문의해주세요!")
+                error_const.ServerError.UNKNOWN_SERVER_ERROR().raise_()
 
 
 PasswordField = typing.Annotated[
