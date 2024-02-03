@@ -67,7 +67,7 @@ class ErrorStruct(pydantic.BaseModel):
             logger.error(repr(self))
         if self.status_code == fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY:
             raise fastapi.exceptions.RequestValidationError(errors=[self])
-        raise fastapi.exceptions.HTTPException(status_code=self.status_code, detail=self.dump())
+        raise fastapi.exceptions.HTTPException(status_code=self.status_code, detail=[self.dump()])
 
     @classmethod
     def raise_multiple(cls, errors: list[ErrorStruct]) -> typing.NoReturn:
@@ -78,7 +78,7 @@ class ErrorStruct(pydantic.BaseModel):
         raise fastapi.exceptions.HTTPException(status_code=status_code, detail=[e.dump() for e in errors])
 
     def response(self) -> fastapi.responses.JSONResponse:
-        content = {"detail": self.dump()}
+        content = {"detail": [self.dump()]}
         return fastapi.responses.JSONResponse(status_code=self.status_code, content=content)
 
 
@@ -91,7 +91,7 @@ class ErrorEnum(ErrorEnumMixin, enum.StrEnum):
     _ignore_ = ["__default_args__", "__additional_args__"]
 
     def __call__(self, **kwargs: tx.Unpack[ErrorStructDict]) -> ErrorStruct:
-        type_name = string_util.camel_to_snake_case(self.__class__.__name__)
+        type_name = string_util.camel_to_snake_case(f"{self.__class__.__name__}.{self.name}")
         return ErrorStruct(
             **{
                 "type": type_name,
