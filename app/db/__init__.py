@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 
 class DBConfigDescriptor(typing.Protocol):
     class SQLAlchemyConfigDescriptor(typing.Protocol):
-        def to_sqlalchemy_config(self) -> dict[str, typing.Any]:
-            ...
+        def to_sqlalchemy_config(self) -> dict[str, typing.Any]: ...
 
     debug: bool
     sqlalchemy: SQLAlchemyConfigDescriptor
@@ -76,6 +75,8 @@ class SyncDB(DB, type_util.SyncConnectedResource):
 
     @contextlib.contextmanager
     def get_sync_session(self) -> typing.Generator[sa_orm.Session, None, None]:
+        if not self.session_maker:
+            raise RuntimeError("DB is not opened")
         with self.session_maker() as session:
             try:
                 yield session
@@ -111,6 +112,8 @@ class AsyncDB(DB, type_util.AsyncConnectedResource):
 
     @contextlib.asynccontextmanager
     async def get_async_session(self) -> typing.AsyncGenerator[sa_ext_asyncio.AsyncSession, None]:
+        if not self.session_maker:
+            raise RuntimeError("DB is not opened")
         async with self.session_maker() as session:
             try:
                 yield session

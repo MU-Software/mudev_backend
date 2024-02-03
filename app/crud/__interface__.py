@@ -45,21 +45,18 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
         return self.columns - {"uuid"}
 
     @typing.overload
-    def get_using_query(self, session: db_types.Ss, query: sa.Select) -> M | None:
-        ...
+    def get_using_query(self, session: db_types.Ss, query: sa.Select) -> M | None: ...
 
     @typing.overload
     def get_using_query(  # type: ignore[misc]
         self, session: db_types.As, query: sa.Select
-    ) -> typing.Awaitable[M | None]:
-        ...
+    ) -> typing.Awaitable[M | None]: ...
 
     def get_using_query(self, session: db_types.Ps, query: sa.Select) -> (M | None) | typing.Awaitable[M | None]:
         return session.scalar(query)
 
     @typing.overload
-    def get(self, session: db_types.Ss, uuid: uuid.UUID) -> M | None:
-        ...
+    def get(self, session: db_types.Ss, uuid: uuid.UUID) -> M | None: ...
 
     @typing.overload
     def get(self, session: db_types.As, uuid: uuid.UUID) -> typing.Awaitable[M | None]:  # type: ignore[misc]
@@ -71,14 +68,12 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
     @typing.overload
     def get_multi_using_query(
         self, session: db_types.Ss, query: sa.Select, *, skip: int | None = None, limit: int | None = None
-    ) -> sa.ScalarResult[M]:
-        ...
+    ) -> sa.ScalarResult[M]: ...
 
     @typing.overload
     def get_multi_using_query(  # type: ignore[misc]
         self, session: db_types.As, query: sa.Select, *, skip: int | None = None, limit: int | None = None
-    ) -> typing.Awaitable[sa.ScalarResult[M]]:
-        ...
+    ) -> typing.Awaitable[sa.ScalarResult[M]]: ...
 
     def get_multi_using_query(
         self, session: db_types.Ps, query: sa.Select, *, skip: int | None = None, limit: int | None = None
@@ -90,8 +85,7 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
         return session.scalars(query)
 
     @typing.overload
-    def create(self, session: db_types.Ss, obj_in: CreateSchema) -> M:
-        ...
+    def create(self, session: db_types.Ss, obj_in: CreateSchema) -> M: ...
 
     @typing.overload
     def create(self, session: db_types.As, obj_in: CreateSchema) -> typing.Awaitable[M]:  # type: ignore[misc]
@@ -140,14 +134,12 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
         return await self.create(session, obj_in=obj_in), True
 
     @typing.overload
-    def update(self, session: db_types.Ss, db_obj: M, obj_in: UpdateSchema) -> M:
-        ...
+    def update(self, session: db_types.Ss, db_obj: M, obj_in: UpdateSchema) -> M: ...
 
     @typing.overload
     def update(  # type: ignore[misc]
         self, session: db_types.As, db_obj: M, obj_in: UpdateSchema
-    ) -> typing.Awaitable[M]:
-        ...
+    ) -> typing.Awaitable[M]: ...
 
     def update(self, session: db_types.Ps, db_obj: M, obj_in: UpdateSchema) -> M | typing.Awaitable[M]:
         # The reason why we get db_obj instead of uuid is
@@ -161,14 +153,12 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
         return db_obj
 
     @typing.overload
-    def delete(self, session: db_types.Ss, uuid: uuid.UUID) -> sa.ScalarResult[M]:
-        ...
+    def delete(self, session: db_types.Ss, uuid: uuid.UUID) -> sa.ScalarResult[M]: ...
 
     @typing.overload
     def delete(  # type: ignore[misc]
         self, session: db_types.As, uuid: uuid.UUID
-    ) -> typing.Awaitable[sa.ScalarResult[M]]:
-        ...
+    ) -> typing.Awaitable[sa.ScalarResult[M]]: ...
 
     def delete(
         self, session: db_types.Ps, uuid: uuid.UUID
@@ -178,14 +168,12 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
         )
 
     @typing.overload
-    def hard_delete(self, session: db_types.Ss, uuid: uuid.UUID) -> sa.ScalarResult[M]:
-        ...
+    def hard_delete(self, session: db_types.Ss, uuid: uuid.UUID) -> sa.ScalarResult[M]: ...
 
     @typing.overload
     def hard_delete(  # type: ignore[misc]
         self, session: db_types.As, uuid: uuid.UUID
-    ) -> typing.Awaitable[sa.ScalarResult[M]]:
-        ...
+    ) -> typing.Awaitable[sa.ScalarResult[M]]: ...
 
     def hard_delete(
         self, session: db_types.Ps, uuid: uuid.UUID
@@ -193,5 +181,4 @@ class CRUDBase(typing.Generic[M, CreateSchema, UpdateSchema]):
         return session.execute(sa.delete(self.model).where(self.model.uuid == uuid).returning(self.model))
 
 
-class EmptySchema(pydantic.BaseModel):
-    ...
+class EmptySchema(pydantic.BaseModel): ...  # noqa: E701
