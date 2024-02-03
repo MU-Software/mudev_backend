@@ -17,8 +17,9 @@ class ProjectSetting(pydantic_settings.BaseSettings):
 
     ssco: SSCoProjectSetting
 
-    @pydantic.field_validator("user_content_dir", mode="before")
-    def validate_user_content_dir(self, value: pydantic.DirectoryPath) -> pydantic.DirectoryPath:
+    @pydantic.field_validator("user_content_dir", mode="after")
+    @classmethod
+    def validate_user_content_dir(cls, value: pydantic.DirectoryPath) -> pydantic.DirectoryPath:
         return value.resolve().absolute()
 
     @functools.cached_property
