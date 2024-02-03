@@ -1,5 +1,4 @@
 import functools
-import typing
 
 import pydantic
 import pydantic_settings
@@ -12,15 +11,15 @@ class SSCoProjectSetting(pydantic_settings.BaseSettings):
 
 
 class ProjectSetting(pydantic_settings.BaseSettings):
+    frontend_domain: pydantic.HttpUrl
+    backend_domain: pydantic.HttpUrl
     user_content_dir: pydantic.DirectoryPath
-    user_content_base_url: pydantic.HttpUrl
 
     ssco: SSCoProjectSetting
 
-    @pydantic.model_validator(mode="after")
-    def validate_model(self) -> typing.Self:
-        self.user_content_dir = self.user_content_dir.resolve().absolute()
-        return self
+    @pydantic.field_validator("user_content_dir", mode="before")
+    def validate_user_content_dir(self, value: pydantic.DirectoryPath) -> pydantic.DirectoryPath:
+        return value.resolve().absolute()
 
     @functools.cached_property
     def upload_to(self) -> filepath_const.FileUploadTo:
