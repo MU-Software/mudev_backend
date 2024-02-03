@@ -148,9 +148,17 @@ async def update_me(
 
 
 @router.get(path="/info/{username}/", response_model=user_schema.UserDTO)
-async def get_user(db_session: common_dep.dbDI, username: str) -> user_model.User:
+async def get_user(
+    db_session: common_dep.dbDI,
+    username: str,
+    access_token: authn_dep.access_token_or_none_di,
+) -> user_model.User:
     stmt = sa.select(user_model.User).where(user_model.User.username == username)
-    return await user_crud.userCRUD.get_using_query(db_session, stmt)
+    if not (result := await user_crud.userCRUD.get_using_query(db_session, stmt)):
+        error_const.ClientError.RESOURCE_NOT_FOUND().raise_()
+    if result.private and (not access_token or result.uuid != access_token.user):
+        error_const.AuthZError.PERMISSION_DENIED().raise_()
+    return result
 
 
 @router.get(
