@@ -51,9 +51,13 @@ class FileMetadataDTO(pydantic.BaseModel):
 
     path: pydantic.FilePath = pydantic.Field(exclude=True, validation_alias="path")
     size: int = pydantic.Field(exclude=True, validation_alias="size")
-    hash: str = pydantic.Field(serialization_alias="ETag")
-    modified_at: datetime.datetime = pydantic.Field(serialization_alias="Last-Modified")
-    mimetype: str = pydantic.Field(serialization_alias="Content-Type")
+    hash: str = pydantic.Field(validation_alias="hash", serialization_alias="ETag", alias_priority=2)
+    mimetype: str = pydantic.Field(validation_alias="mimetype", serialization_alias="Content-Type", alias_priority=2)
+    modified_at: datetime.datetime = pydantic.Field(
+        validation_alias="modified_at",
+        serialization_alias="Last-Modified",
+        alias_priority=2,
+    )
 
     accept_ranges: typing.Literal["bytes"] = "bytes"
     cache_control: list[ResponseCacheControlType] = ["no-cache"]
