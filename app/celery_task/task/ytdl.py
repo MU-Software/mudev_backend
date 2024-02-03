@@ -142,8 +142,7 @@ def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, youtube_vi
         for row in file_records.values():
             session.refresh(row)
             ext = typing.cast(pt.Path, row.path).suffix.replace(".", "")
-            base_url = self.config_obj.project.user_content_base_url
-            file_download_urls[ext] = f"{base_url}file/{row.uuid}/download/"
+            file_download_urls[ext] = f"{self.config_obj.project.backend_domain}/file/{row.uuid}/download/"
 
     # 완료 후, 요청한 유저에게 알림을 보냅니다.
     # route에서 등록하는 중에 알림을 보내는 일을 방지하기 위해, 3초 후에 알림을 보내도록 합니다.
