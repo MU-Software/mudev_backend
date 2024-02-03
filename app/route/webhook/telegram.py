@@ -79,7 +79,6 @@ async def create_ytdl_task(
 
     video_create_obj = ssco_schema.VideoCreate(youtube_vid=youtube_id)
     video_record, created = await ssco_crud.videoCRUD.get_or_create_async(db_session, video_create_obj)
-    await db_session.refresh(video_record, ["users"])
     video_record.users.add(await user_crud.userCRUD.get(db_session, uuid=user_uuid))
     await db_session.commit()
 

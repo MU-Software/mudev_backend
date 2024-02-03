@@ -102,7 +102,6 @@ class UserSignInHistoryCRUD(
         self, session: db_types.As, obj_in: user_schema.UserSignInHistoryCreate
     ) -> user_schema.RefreshToken:
         db_obj = await self.create(session=session, obj_in=obj_in)
-        await session.refresh(db_obj)
         return user_schema.RefreshToken.from_orm(signin_history=db_obj, config_obj=obj_in.config_obj)
 
     async def refresh(self, session: db_types.As, token: user_schema.RefreshToken) -> user_schema.RefreshToken:

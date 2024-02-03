@@ -57,8 +57,6 @@ async def signin(
     response: fastapi.Response,
 ) -> dict:
     user = await user_crud.userCRUD.signin(db_session, user_ident=payload.username, password=payload.password)
-    await db_session.refresh(user)  # TODO: Remove this
-
     refresh_token_obj = await user_crud.userSignInHistoryCRUD.signin(
         session=db_session,
         obj_in=user_schema.UserSignInHistoryCreate(
