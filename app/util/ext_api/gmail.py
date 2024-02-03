@@ -2,6 +2,7 @@ import base64
 import contextlib
 import imaplib
 import json
+import operator
 import smtplib
 import urllib.parse
 import urllib.request
@@ -27,7 +28,9 @@ def url_unescape(text: str) -> str:
 
 
 def url_format_params(params: dict[str, str]) -> str:
-    return "&".join(f"{param[0]}={url_escape(param[1])}" for param in sorted(params.items(), key=lambda x: x[0]))
+    return "&".join(
+        f"{param[0]}={url_escape(param[1])}" for param in sorted(params.items(), key=operator.itemgetter(0))
+    )
 
 
 def generate_permission_url(client_id: str, scope: str = "https://mail.google.com/") -> str:
