@@ -2,6 +2,7 @@ import typing
 
 import fastapi
 import sqlalchemy as sa
+import sqlalchemy.orm as sa_orm
 
 import app.celery_task.task.ytdl as ytdl_task
 import app.const.tag as tag_const
@@ -25,8 +26,9 @@ async def get_user_videos(
         sa.select(ssco_model.Video)
         .join(ssco_model.VideoUserRelation)
         .where(ssco_model.VideoUserRelation.user_uuid == access_token.user)
+        .options(sa_orm.joinedload(ssco_model.Video.files))
     )
-    return await ssco_crud.videoCRUD.get_multi_using_query(db_session, stmt)
+    return (await ssco_crud.videoCRUD.get_multi_using_query(db_session, stmt)).unique().all()
 
 
 @router.post(path="/")
@@ -38,7 +40,6 @@ async def create_video_download_task(
     """비디오 다운로드 작업을 생성합니다."""
     video_create_obj = ssco_schema.VideoCreate(youtube_vid=payload.youtube_vid)
     video_record, created = await ssco_crud.videoCRUD.get_or_create_async(db_session, video_create_obj)
-    await db_session.refresh(video_record, ["users"])
     video_record.users.add(await user_crud.userCRUD.get(db_session, uuid=access_token.user))
     await db_session.commit()
 

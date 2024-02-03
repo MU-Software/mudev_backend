@@ -6,6 +6,7 @@ import uuid
 
 import pydantic
 
+import app.schema.file as file_schema
 import app.util.ext_api.youtube as youtube_util
 
 
@@ -14,6 +15,8 @@ class VideoDTO(pydantic.BaseModel):
     title: str
     thumbnail_uuid: uuid.UUID
     data: pydantic.Json | dict | None = None
+
+    files: list[file_schema.FileInfoDTO] | None = None
 
 
 class VideoDownloadRequestPayload(pydantic.BaseModel):
