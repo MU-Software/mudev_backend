@@ -43,7 +43,7 @@ async def get_system_user(db_session: dbDI, config_obj: settingDI) -> user_model
     if not (system_user := await db_session.scalar(stmt)):
         system_user = user_model.User(
             username="system",
-            password=argon2.PasswordHasher().hash(config_obj.secret_key),
+            password=argon2.PasswordHasher().hash(config_obj.secret_key.get_secret_value()),
             email="system@mudev.cc",
             email_verified_at=sa.func.now(),
             nickname="system",
