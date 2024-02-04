@@ -16,7 +16,7 @@ class CookieKey(enum.Enum):
         alias: str | None = None
 
     CSRF_TOKEN = CookieKeyData(path="/", expires=time_const.NEVER_EXPIRE_COOKIE_DATETIME)
-    REFRESH_TOKEN = CookieKeyData(path="/user/")
+    REFRESH_TOKEN = CookieKeyData(path="/authn/")
 
     def get_name(self) -> str:
         return (self.name if self.value.alias is None else self.value.alias).lower()

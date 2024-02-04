@@ -17,14 +17,14 @@ import app.redis.key_type as redis_keytype
 import app.schema.user as user_schema
 
 oauth2_password_scheme = fastapi.security.OAuth2PasswordBearer(
-    tokenUrl="/user/signin/",
+    tokenUrl="/authn/signin/",
     auto_error=False,
 )
 
 # oauth2_authorization_code_scheme = fastapi.security.OAuth2AuthorizationCodeBearer(
-#     authorizationUrl="/user/signin/",
-#     tokenUrl="/user/refresh/",
-#     refreshUrl="/user/refresh/",
+#     authorizationUrl="/authn/signin/",
+#     tokenUrl="/authn/refresh/",
+#     refreshUrl="/authn/refresh/",
 # )
 
 

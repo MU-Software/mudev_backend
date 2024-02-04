@@ -10,9 +10,11 @@ class OpenAPITag(enum.StrEnum):
         return " ".join(map(lambda x: x.capitalize(), name.split("_")))
 
     HEALTH_CHECK = enum.auto()
+    AUTHN = enum.auto()
     USER = enum.auto()
     USER_FILE = enum.auto()
     USER_SIGNIN_HISTORY = enum.auto()
     WEBHOOK = enum.auto()
 
+    AUTHCO = "AuthCo"
     YTDL = "YouTube Downloader"
