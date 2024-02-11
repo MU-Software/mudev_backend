@@ -49,4 +49,4 @@ class SentrySetting(pydantic_settings.BaseSettings):
         if mode not in self.MODE_LIST:
             raise ValueError(f"Invalid mode: {mode}")
 
-        return {attr: getattr(self, f"{mode}_{attr}") for attr in self.ATTR_LIST for mode in self.MODE_LIST}
+        return {attr: getattr(self, f"{mode}_{attr}") for attr in self.ATTR_LIST}
