@@ -21,8 +21,15 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    celery_conf = celery_config.get_celery_setting()
+
+    if args.mode == "worker" and celery_conf.sentry.is_sentry_available(mode="celery"):
+        import sentry_sdk
+
+        sentry_sdk.init(**celery_conf.sentry.build_config(mode="celery"))
+
     celery_app = celery.Celery()
-    celery_app.config_from_object(celery_config.get_celery_setting())
+    celery_app.config_from_object(celery_conf)
     celery_app.set_default()
 
     loglevel = f"--loglevel={args.loglevel}"

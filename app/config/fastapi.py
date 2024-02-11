@@ -13,6 +13,7 @@ import pydantic
 import pydantic_settings
 import toml
 
+import app.config.monitor as monitor_config
 import app.config.project as project_config
 import app.config.redis as redis_config
 import app.config.route as route_config
@@ -96,6 +97,7 @@ class FastAPISetting(pydantic_settings.BaseSettings):
     project: project_config.ProjectSetting
     openapi: OpenAPISetting = OpenAPISetting()
     security: SecuritySetting = SecuritySetting()
+    sentry: monitor_config.SentrySetting
     route: route_config.RouteSetting
 
     model_config = pydantic_settings.SettingsConfigDict(extra="ignore")

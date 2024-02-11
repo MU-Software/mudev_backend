@@ -28,6 +28,11 @@ def create_app(**kwargs: dict) -> fastapi.FastAPI:
             await async_stack.enter_async_context(app.state.async_redis)  # type: ignore[arg-type]
             yield
 
+    if config_obj.sentry.is_sentry_available(mode="api"):
+        import sentry_sdk
+
+        sentry_sdk.init(**config_obj.sentry.build_config(mode="api"))
+
     app = fastapi.FastAPI(
         **kwargs | fastapi_config.get_fastapi_setting().to_fastapi_config(),
         lifespan=app_lifespan,
