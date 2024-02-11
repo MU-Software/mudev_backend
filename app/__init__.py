@@ -31,7 +31,33 @@ def create_app(**kwargs: dict) -> fastapi.FastAPI:
     if config_obj.sentry.is_sentry_available(mode="api"):
         import sentry_sdk
 
-        sentry_sdk.init(**config_obj.sentry.build_config(mode="api"))
+        def traces_sampler(ctx: dict[str, typing.Any]) -> float:
+            """
+            This function is used to determine if a transaction should be sampled.
+            from https://stackoverflow.com/a/74412613
+            """
+            if (parent_sampled := ctx.get("parent_sampled")) is not None:
+                # If this transaction has a parent, we usually want to sample it
+                # if and only if its parent was sampled.
+                return parent_sampled
+            if "wsgi_environ" in ctx:
+                # Get the URL for WSGI requests
+                url = ctx["wsgi_environ"].get("PATH_INFO", "")
+            elif "asgi_scope" in ctx:
+                # Get the URL for ASGI requests
+                url = ctx["asgi_scope"].get("path", "")
+            else:
+                # Other kinds of transactions don't have a URL
+                url = ""
+            if ctx["transaction_context"]["op"] == "http.server":
+                # Conditions only relevant to operation "http.server"
+                if any(url.startswith(ignored_route) for ignored_route in config_obj.sentry.api_ignored_trace_routes):
+                    return 0  # Don't trace any of these transactions
+            return config_obj.sentry.api_traces_sample_rate
+
+        sentry_init_kwargs = {**config_obj.sentry.build_config(mode="api"), "traces_sampler": traces_sampler}
+        sentry_init_kwargs.pop("traces_sample_rate")
+        sentry_sdk.init(**sentry_init_kwargs)
 
     app = fastapi.FastAPI(
         **kwargs | fastapi_config.get_fastapi_setting().to_fastapi_config(),

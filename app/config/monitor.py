@@ -11,6 +11,7 @@ class SentrySetting(pydantic_settings.BaseSettings):
     api_enable_tracing: bool = True
     api_traces_sample_rate: float = 1.0
     api_profiles_sample_rate: float = 1.0
+    api_ignored_trace_routes: set[str] = {"/healthz", "/livez", "/readyz"}
 
     celery_dsn: pydantic.HttpUrl | None = None
     celery_enable_tracing: bool = True
