@@ -9,19 +9,19 @@ SENTRY_MODE = typing.Literal["api", "celery"]
 class SentrySetting(pydantic_settings.BaseSettings):
     api_dsn: pydantic.HttpUrl | None = None
     api_enable_tracing: bool = True
-    api_trace_sample_rate: float = 1.0
+    api_traces_sample_rate: float = 1.0
     api_profiles_sample_rate: float = 1.0
 
     celery_dsn: pydantic.HttpUrl | None = None
     celery_enable_tracing: bool = True
-    celery_trace_sample_rate: float = 1.0
+    celery_traces_sample_rate: float = 1.0
     celery_profiles_sample_rate: float = 1.0
 
     MODE_LIST: typing.ClassVar[set[SENTRY_MODE]] = {"api", "celery"}
     ATTR_LIST: typing.ClassVar[set[str]] = {
         "dsn",
         "enable_tracing",
-        "trace_sample_rate",
+        "traces_sample_rate",
         "profiles_sample_rate",
     }
 
