@@ -42,8 +42,8 @@ RUN curl -sL https://sentry.io/get-cli/ | bash; \
     rm -rf /var/cache/apt/archives /var/lib/apt/lists/*;
 
 # Make docker to always copy app directory so that source code can be refreshed.
-ARG INVALIDATE_CACHE_DATE=unknown
-RUN echo INVALIDATE_CACHE_DATE
+ARG IMAGE_BUILD_DATETIME=unknown
+ENV DEPLOYMENT_IMAGE_BUILD_DATETIME=$IMAGE_BUILD_DATETIME
 
 # Copy main app
 COPY ../alembic.ini ./alembic.ini

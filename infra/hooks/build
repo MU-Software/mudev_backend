@@ -6,5 +6,5 @@ docker build \
 	-f Dockerfile \
 	--target runtime \
 	--build-arg GIT_HASH="$(git rev-parse HEAD)" \
-	--build-arg INVALIDATE_CACHE_DATE="$(date +%Y-%m-%d_%H:%M:%S)" \
+	--build-arg IMAGE_BUILD_DATETIME="$(date +%Y-%m-%d_%H:%M:%S)" \
 	../

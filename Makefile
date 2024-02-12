@@ -71,7 +71,7 @@ docker-build:
 	docker build \
 		-f ./infra/Dockerfile --target runtime -t $(IMAGE_NAME) \
 		--build-arg GIT_HASH=$(shell git rev-parse HEAD) \
-		--build-arg INVALIDATE_CACHE_DATE=$(shell date +%Y-%m-%d_%H:%M:%S) \
+		--build-arg IMAGE_BUILD_DATETIME=$(shell date +%Y-%m-%d_%H:%M:%S) \
 		$(DOCKER_MID_BUILD_OPTIONS) $(PROJECT_DIR) $(DOCKER_END_BUILD_OPTIONS)
 
 # For local environments
