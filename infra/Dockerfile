@@ -35,7 +35,8 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 COPY --from=builder /usr/local/lib/python3.11/lib-dynload /usr/local/lib/python3.11/lib-dynload/
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages/
 
-RUN apt-get autoremove -y; \
+RUN curl -sL https://sentry.io/get-cli/ | bash; \
+    apt-get autoremove -y; \
     apt-get autoclean -y; \
     apt-get clean -y; \
     rm -rf /var/cache/apt/archives /var/lib/apt/lists/*;
