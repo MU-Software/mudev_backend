@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import logging
 import pathlib as pt
+
+import fastapi
 
 import app.error_handler.__type__ as err_type
 import app.util.import_util as import_util
+import app.util.mu_exception as exception_util
+
+logger = logging.getLogger(__name__)
 
 
 def get_error_handlers() -> err_type.ErrHandlersDef:
@@ -12,4 +18,12 @@ def get_error_handlers() -> err_type.ErrHandlersDef:
         "err_",
         pt.Path(__file__).parent,
     )
-    return {k: v for d in error_handler_collection for k, v in d.items()}
+
+    def error_logger_decorator(err_handler: err_type.ErrHandlerType) -> err_type.ErrHandlerType:
+        async def wrapper(req: fastapi.Request, err: Exception) -> err_type.RespType:
+            logger.warning(exception_util.get_traceback_msg(err))
+            return await err_handler(req, err)
+
+        return wrapper
+
+    return {k: error_logger_decorator(v) for d in error_handler_collection for k, v in d.items()}
