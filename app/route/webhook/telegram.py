@@ -40,7 +40,7 @@ async def auth_user(ctx: telegram_util.CommandHandlerContext) -> None:
         telegram_util.send_msg_and_raise(ctx.payload, error_const.TelegramError.USER_ALREADY_SYNCED())
 
     sns_user = typing.cast(telegram.User, ctx.payload.effective_user)
-    sns_chat = ctx.payload.effective_message.chat
+    sns_chat = ctx.payload.effective_message.chat.id
 
     sns_type = sns_const.SNSAuthInfoUserAgentEnum.telegram.value
     sns_token = user_schema.SNSClientInfo(sns_type=sns_type, user_id=sns_user.id, chat_id=sns_chat).model_dump_json()
