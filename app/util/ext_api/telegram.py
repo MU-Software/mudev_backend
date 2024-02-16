@@ -47,7 +47,7 @@ def send_msg_and_raise(update: telegram.Update, err: error_const.ErrorStruct) ->
 
 def is_handler_pattern_match(pattern: re.Pattern | str, in_str: str) -> bool:
     return (isinstance(pattern, str) and in_str.startswith(pattern)) or (
-        isinstance(pattern, re.Pattern) and bool(pattern.match(in_str))
+        isinstance(pattern, re.Pattern) and bool(pattern.search(in_str))
     )
 
 
