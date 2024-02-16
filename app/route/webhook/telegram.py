@@ -3,6 +3,7 @@ import re
 import typing
 
 import fastapi
+import pydantic
 import sqlalchemy as sa
 import telegram
 
@@ -143,7 +144,13 @@ async def webhook_handler(
         telegram_util.send_msg_and_raise(payload, error_const.TelegramError.HANDLER_NOT_MATCH())
 
     sns_type = sns_const.SNSAuthInfoUserAgentEnum.telegram
-    user_uuid = await user_crud.snsAuthInfoCRUD.sns_user_to_user(db_session, sns_type, user.id)
+    try:
+        sns_token = user_schema.SNSClientInfo(
+            sns_type=sns_type, user_id=user.id, chat_id=msg_obj.chat.id
+        ).model_dump_json()
+    except pydantic.ValidationError:
+        sns_token = None
+    user_uuid = await user_crud.snsAuthInfoCRUD.sns_token_to_user(db_session, sns_type, sns_token)
 
     if handler.require_auth and not user_uuid:
         telegram_util.send_msg_and_raise(payload, error_const.AuthZError.REQUIRES_ACCOUNT_SYNC())

@@ -117,20 +117,20 @@ class UserSignInHistoryCRUD(
 class SNSAuthInfoCRUD(
     crud_interface.CRUDBase[user_model.UserSignInHistory, user_schema.SNSAuthInfoCreate, crud_interface.EmptySchema]
 ):
-    async def sns_user_to_user(
+    async def sns_token_to_user(
         self,
         session: db_types.As,
         sns_type: sns_const.SNSAuthInfoUserAgentEnum,
-        user_id: int | None,
+        sns_token: str | None,
     ) -> uuid.UUID | None:
-        if not user_id:
+        if not sns_token:
             return None
 
         stmt = sa.select(self.model).where(
             self.model.user_agent == sns_type.value,
-            self.model.client_token == str(user_id),
+            self.model.client_token == sns_token,
             # 삭제되지 않았거나 만료되지 않은 토큰만 사용
-            sa.or_(self.model.deleted_at.is_(None), self.model.expires_at > sa.func.now()),
+            sa.and_(self.model.deleted_at.is_(None), self.model.expires_at > sa.func.now()),
         )
         return auth.user_uuid if (auth := await self.get_using_query(session=session, query=stmt)) else None
 
@@ -144,7 +144,7 @@ class SNSAuthInfoCRUD(
             self.model.user_uuid == user_uuid,
             self.model.user_agent == sns_type.value,
             # 삭제되지 않았거나 만료되지 않은 토큰만 사용
-            sa.or_(self.model.deleted_at.is_(None), self.model.expires_at > sa.func.now()),
+            sa.and_(self.model.deleted_at.is_(None), self.model.expires_at > sa.func.now()),
         )
         return [
             user_schema.SNSClientInfo.model_validate_json(sns_history.client_token)
