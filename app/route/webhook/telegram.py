@@ -3,6 +3,7 @@ import re
 import typing
 
 import fastapi
+import sqlalchemy as sa
 import telegram
 
 import app.celery_task.task.ytdl as ytdl_task
@@ -11,6 +12,7 @@ import app.const.sns as sns_const
 import app.const.tag as tag_const
 import app.crud.ssco as ssco_crud
 import app.crud.user as user_crud
+import app.db.model.ssco as ssco_model
 import app.dependency.common as common_dep
 import app.schema.ssco as ssco_schema
 import app.schema.user as user_schema
@@ -53,19 +55,38 @@ async def auth_user(ctx: telegram_util.CommandHandlerContext) -> None:
 
 
 async def create_ytdl_task(ctx: telegram_util.CommandHandlerContext) -> None:
-    if not (message := ctx.payload.effective_message):
-        raise fastapi.HTTPException(status_code=422, detail="메시지에서 정보를 얻을 수 없었습니다.")
+    message: telegram.Message = ctx.payload.effective_message
     if not (youtube_id := youtube_util.extract_vid_from_url(message.text)):
-        await ctx.payload.effective_message.reply_text(text="유효한 YouTube URL이 아니에요.")
+        await message.reply_text(text="유효한 YouTube URL이 아니에요.")
         return None
 
-    video_create_obj = ssco_schema.VideoCreate(youtube_vid=youtube_id)
-    video_record, created = await ssco_crud.videoCRUD.get_or_create_async(ctx.db_session, video_create_obj)
+    stmt = sa.select(ssco_model.Video).where(ssco_model.Video.youtube_vid == youtube_id)
+    if not (video_record := await ssco_crud.videoCRUD.get_using_query(ctx.db_session, stmt)):
+        video_create_obj = ssco_schema.VideoCreate(youtube_vid=youtube_id)
+        video_record = await ssco_crud.videoCRUD.create(ctx.db_session, obj_in=video_create_obj)
+        ytdl_task.ytdl_downloader_task.delay(youtube_vid=youtube_id)
+
+    await ctx.db_session.refresh(video_record, attribute_names=["users", "files"])
     video_record.users.add(await user_crud.userCRUD.get(ctx.db_session, uuid=ctx.user_uuid))
     await ctx.db_session.commit()
 
-    if created:
-        ytdl_task.ytdl_downloader_task.delay(youtube_vid=youtube_id)
+    if video_record.files:
+        btn_markup = telegram.InlineKeyboardMarkup(
+            [
+                [
+                    telegram.InlineKeyboardButton(
+                        text=f"{file.mimetype} 파일 다운로드",
+                        url=f"{ctx.config.project.backend_domain}/file/{file.uuid}/download/",
+                    )
+                ]
+                for file in video_record.files
+            ]
+        )
+        message.reply_text(text=f"영상이 준비됐어요!\n{video_record.title}", reply_markup=btn_markup)
+        return None
+
+    message.reply_text(text="영상을 내려받는 중이에요,\n잠시만 기다려주세요...\n(완료되면 따로 알림을 드릴게요.)")
+    return None
 
 
 cmds: dict[re.Pattern | str, telegram_util.CommandHandler] = {
@@ -93,6 +114,7 @@ cmds: dict[re.Pattern | str, telegram_util.CommandHandler] = {
         title="유튜브 영상 다운로드",
         description="유튜브 영상을 다운로드합니다.",
         handler=create_ytdl_task,
+        require_auth=True,
         show_in_help=False,
     ),
 }

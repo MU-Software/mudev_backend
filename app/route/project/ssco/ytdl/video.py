@@ -38,11 +38,12 @@ async def create_video_download_task(
     payload: ssco_schema.VideoDownloadRequestPayload,
 ) -> None:
     """비디오 다운로드 작업을 생성합니다."""
-    video_create_obj = ssco_schema.VideoCreate(youtube_vid=payload.youtube_vid)
-    video_record, created = await ssco_crud.videoCRUD.get_or_create_async(db_session, video_create_obj)
+    stmt = sa.select(ssco_model.Video).where(ssco_model.Video.youtube_vid == payload.youtube_vid)
+    if not (video_record := await ssco_crud.videoCRUD.get_using_query(db_session, stmt)):
+        video_create_obj = ssco_schema.VideoCreate(youtube_vid=payload.youtube_vid)
+        video_record = await ssco_crud.videoCRUD.create(db_session, obj_in=video_create_obj)
+        ytdl_task.ytdl_downloader_task.delay(youtube_vid=payload.youtube_vid)
+
+    await db_session.refresh(video_record, attribute_names=["users"])
     video_record.users.add(await user_crud.userCRUD.get(db_session, uuid=access_token.user))
     await db_session.commit()
-
-    if created:
-        ytdl_task.ytdl_downloader_task.delay(youtube_vid=payload.youtube_vid)
-    return None
