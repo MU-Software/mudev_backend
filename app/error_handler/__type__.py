@@ -8,5 +8,7 @@ import starlette.requests
 ExcType: typing.TypeAlias = typing.Type[Exception]
 ReqType: typing.TypeAlias = starlette.requests.Request
 RespType: typing.TypeAlias = fastapi.responses.JSONResponse
-ErrHandlerType: typing.TypeAlias = typing.Callable[[ReqType, Exception], RespType]
+SyncErrHandlerType: typing.TypeAlias = typing.Callable[[ReqType, Exception], RespType]
+AsyncErrHandlerType: typing.TypeAlias = typing.Callable[[ReqType, Exception], typing.Awaitable[RespType]]
+ErrHandlerType: typing.TypeAlias = SyncErrHandlerType | AsyncErrHandlerType
 ErrHandlersDef: typing.TypeAlias = dict[ExcType, ErrHandlerType]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import pathlib as pt
 
@@ -22,7 +23,7 @@ def get_error_handlers() -> err_type.ErrHandlersDef:
     def error_logger_decorator(err_handler: err_type.ErrHandlerType) -> err_type.ErrHandlerType:
         async def wrapper(req: fastapi.Request, err: Exception) -> err_type.RespType:
             logger.warning(exception_util.get_traceback_msg(err))
-            return await err_handler(req, err)
+            return (await response) if asyncio.iscoroutine(response := err_handler(req, err)) else response
 
         return wrapper
 
