@@ -23,8 +23,10 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_YOUTUBE_DL_EXECUTABLE_INFO: list[str] = ["poetry", "run", sys.executable, "-m", "yt_dlp"]
 
-VIDEO_REGEX = re.compile(r"(?:youtube\.com|youtu\.be)/(?:[\w-]+\?v=|embed/|v/|shorts/)?([\w-]{11})")
-PLAYLIST_REGEX = re.compile(r"(?:youtube\.com|youtu\.be)\/(?:[\w\-\?\&\=\/]+[?&])list=([\w-]{34})")
+VIDEO_REGEX = re.compile(
+    r"(?:youtube\.com|youtu\.be)/(?:[\w-]+\?v=|embed/|v/|shorts/)?([\w-]{11})", flags=re.IGNORECASE
+)
+PLAYLIST_REGEX = re.compile(r"(?:youtube\.com|youtu\.be)\/(?:[\w\-\?\&\=\/]+[?&])list=([\w-]{34})", flags=re.IGNORECASE)
 
 POSSIBLE_THUMBNAIL_QUALITY: list[str] = [
     "maxresdefault",  # Best quality
