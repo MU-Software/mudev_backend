@@ -47,7 +47,7 @@ async def auth_user(ctx: telegram_util.CommandHandlerContext) -> None:
     sns_info = user_schema.SNSAuthInfo(user_agent=sns_type, client_token=sns_token)
 
     key = ctx.config.secret_key.get_secret_value()
-    url = ctx.config.project.frontend_domain + "/user/sns?sns_token=" + sns_info.to_token(key)
+    url = f"{ctx.config.project.frontend_domain}/user/sns?sns_token={sns_info.to_token(key)}"
     btn_markup = telegram.InlineKeyboardMarkup([[telegram.InlineKeyboardButton(text="mudev.cc 인증", url=url)]])
     await ctx.payload.effective_message.reply_text(
         text="아래 버튼을 눌러 mudev.cc 계정 연동을 진행해주세요.", reply_markup=btn_markup
