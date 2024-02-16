@@ -197,7 +197,7 @@ class SNSClientInfo(pydantic.BaseModel):
     chat_id: int  # Chat ID
 
 
-class SNSAuthInfo(UserSignInHistoryCreate, pydantic.BaseModel):
+class SNSAuthInfo(pydantic.BaseModel):
     user_agent: sns_const.SNSAuthInfoUserAgentEnum
     client_token: SNSClientInfo
 
@@ -220,7 +220,7 @@ class SNSAuthInfo(UserSignInHistoryCreate, pydantic.BaseModel):
         return client_token.model_dump_json()
 
 
-class SNSAuthInfoCreate(SNSAuthInfo, pydantic.BaseModel):  # type: ignore[misc]
+class SNSAuthInfoCreate(SNSAuthInfo, UserSignInHistoryCreate, pydantic.BaseModel):  # type: ignore[misc]
     @classmethod
     def from_token(
         cls, user_uuid: uuid.UUID, ip: str, config_obj: fastapi_config.FastAPISetting, token: str
