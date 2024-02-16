@@ -213,10 +213,9 @@ class ClientError(ErrorEnum):
 
 
 class TelegramError(ErrorEnum):
-    __default_args__ = {"status_code": fastapi.status.HTTP_400_BAD_REQUEST, "should_log": False}
+    __default_args__ = {"status_code": fastapi.status.HTTP_200_OK, "should_log": False}
     __additional_args__ = {
-        "USER_ALREADY_SYNCED": ErrorStructDict(status_code=fastapi.status.HTTP_409_CONFLICT),
-        "HANDLER_NOT_MATCH": ErrorStructDict(status_code=fastapi.status.HTTP_200_OK),
+        "MESSAGE_NOT_GIVEN": ErrorStructDict(status_code=fastapi.status.HTTP_400_BAD_REQUEST),
     }
 
     USER_NOT_GIVEN = "사용자 정보가 없어요."
