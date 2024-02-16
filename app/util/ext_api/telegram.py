@@ -37,11 +37,11 @@ class CommandHandler:
     show_in_help: bool = True
 
 
-def send_msg_and_raise(update: telegram.Update, err: error_const.ErrorStruct) -> typing.NoReturn:
+async def send_msg_and_raise(update: telegram.Update, err: error_const.ErrorStruct) -> typing.NoReturn:
     if update.effective_message:
-        update.effective_message.reply_text(err.msg)
+        await update.effective_message.reply_text(err.msg)
     elif update.effective_chat:
-        update.get_bot().send_message(chat_id=update.effective_chat.id, text=err.msg)
+        await update.get_bot().send_message(chat_id=update.effective_chat.id, text=err.msg)
     err.raise_()
 
 

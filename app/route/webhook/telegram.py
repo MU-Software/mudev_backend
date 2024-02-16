@@ -38,7 +38,7 @@ async def start(ctx: telegram_util.CommandHandlerContext) -> None:
 
 async def auth_user(ctx: telegram_util.CommandHandlerContext) -> None:
     if ctx.user_uuid:
-        telegram_util.send_msg_and_raise(ctx.payload, error_const.TelegramError.USER_ALREADY_SYNCED())
+        await telegram_util.send_msg_and_raise(ctx.payload, error_const.TelegramError.USER_ALREADY_SYNCED())
 
     sns_user = typing.cast(telegram.User, ctx.payload.effective_user)
     sns_chat = ctx.payload.effective_message.chat.id
@@ -83,10 +83,10 @@ async def create_ytdl_task(ctx: telegram_util.CommandHandlerContext) -> None:
                 for file in video_record.files
             ]
         )
-        message.reply_text(text=f"영상이 준비됐어요!\n{video_record.title}", reply_markup=btn_markup)
+        await message.reply_text(text=f"영상이 준비됐어요!\n{video_record.title}", reply_markup=btn_markup)
         return None
 
-    message.reply_text(text="영상을 내려받는 중이에요,\n잠시만 기다려주세요...\n(완료되면 따로 알림을 드릴게요.)")
+    await message.reply_text(text="영상을 내려받는 중이에요,\n잠시만 기다려주세요...\n(완료되면 따로 알림을 드릴게요.)")
     return None
 
 
@@ -134,14 +134,14 @@ async def webhook_handler(
     if not (payload := telegram_util.parse_request(await request.body(), bot)):
         error_const.ClientError.REQUEST_BODY_EMPTY().raise_()
     if not ((msg_obj := payload.effective_message) and (msg_str := msg_obj.text)):
-        telegram_util.send_msg_and_raise(payload, error_const.TelegramError.MESSAGE_NOT_GIVEN())
+        await telegram_util.send_msg_and_raise(payload, error_const.TelegramError.MESSAGE_NOT_GIVEN())
     if not (user := payload.effective_user):
-        telegram_util.send_msg_and_raise(payload, error_const.TelegramError.USER_NOT_GIVEN())
+        await telegram_util.send_msg_and_raise(payload, error_const.TelegramError.USER_NOT_GIVEN())
     if user.is_bot:
-        telegram_util.send_msg_and_raise(payload, error_const.AuthZError.BOT_USER_NOT_ALLOWED())
+        await telegram_util.send_msg_and_raise(payload, error_const.AuthZError.BOT_USER_NOT_ALLOWED())
 
     if not (handler := telegram_util.get_handler(cmds, string_util.normalize(msg_str).strip())):
-        telegram_util.send_msg_and_raise(payload, error_const.TelegramError.HANDLER_NOT_MATCH())
+        await telegram_util.send_msg_and_raise(payload, error_const.TelegramError.HANDLER_NOT_MATCH())
 
     sns_type = sns_const.SNSAuthInfoUserAgentEnum.telegram
     try:
@@ -153,7 +153,7 @@ async def webhook_handler(
     user_uuid = await user_crud.snsAuthInfoCRUD.sns_token_to_user(db_session, sns_type, sns_token)
 
     if handler.require_auth and not user_uuid:
-        telegram_util.send_msg_and_raise(payload, error_const.AuthZError.REQUIRES_ACCOUNT_SYNC())
+        await telegram_util.send_msg_and_raise(payload, error_const.AuthZError.REQUIRES_ACCOUNT_SYNC())
 
     await handler.handler(
         telegram_util.CommandHandlerContext(
