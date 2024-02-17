@@ -75,7 +75,7 @@ def run_ffmpeg_for_video_to_m4a_and_mp3(video_path: pt.Path, coverart_path: pt.P
     m4a_output_node = audio_node.stream(1).output(target_m4a_path.as_posix())
     mp3_output_node = (
         audio_node.stream(0)
-        .output(ffmpeg.input(target_coverart_path), target_mp3_path.as_posix())
+        .output(ffmpeg.input(target_coverart_path.as_posix()), target_mp3_path.as_posix())
         .global_args("-disposition:0", "attached_pic")
         .global_args("-id3v2_version", "3")
     )
