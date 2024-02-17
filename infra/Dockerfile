@@ -46,11 +46,7 @@ ARG IMAGE_BUILD_DATETIME=unknown
 ENV DEPLOYMENT_IMAGE_BUILD_DATETIME=$IMAGE_BUILD_DATETIME
 
 # Copy main app
-RUN addgroup musoftware;\
-    adduser --ingroup musoftware --disabled-password --no-create-home --gecos "" musoftware
-COPY --chown=musoftware:musoftware ../alembic.ini ./alembic.ini
-COPY --chown=musoftware:musoftware ../pyproject.toml ./pyproject.toml
-COPY --chown=musoftware:musoftware ../app/ /app
-RUN mkdir -p user_content && chown -R musoftware:musoftware user_content
-
-USER musoftware
+COPY ../alembic.ini ./alembic.ini
+COPY ../pyproject.toml ./pyproject.toml
+COPY ../app/ /app
+RUN mkdir -p user_content
