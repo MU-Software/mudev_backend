@@ -60,7 +60,11 @@ def raise_if_task_not_runnable(task: celery_interface.SessionTask) -> None:
             raise task.retry(**retry_kwargs, exc=RuntimeError("Updater is running"))
 
 
-def run_ffmpeg_for_video_to_m4a_and_mp3(video_path: pt.Path, coverart_path: pt.Path) -> dict[str, pt.Path]:
+def run_ffmpeg_for_video_to_m4a_and_mp3(
+    video_path: pt.Path,
+    coverart_path: pt.Path,
+    ffmpeg_cmd: str = "ffmpeg",
+) -> dict[str, pt.Path]:
     """ffmpeg를 이용해 영상 파일을 m4a와 mp3 파일로 변환하는 명령어를 생성합니다."""
     target_video_path = video_path
     target_coverart_path = coverart_path
@@ -82,12 +86,12 @@ def run_ffmpeg_for_video_to_m4a_and_mp3(video_path: pt.Path, coverart_path: pt.P
     merged_node: ffmpeg.nodes.Node = ffmpeg.merge_outputs(mp3_output_node, m4a_output_node)
 
     if docker_util.is_container():
-        compiled_args: list[str] = ffmpeg.compile(merged_node, overwrite_output=True)
+        compiled_args: list[str] = ffmpeg.compile(merged_node, overwrite_output=True, cmd=ffmpeg_cmd)
         stdout, stderr = docker_util.run_cmd_on_host(compiled_args)
         logger.warning(f"ffmpeg stdout:\n{stdout}")
         logger.warning(f"ffmpeg stderr:\n{stderr}")
     else:
-        ffmpeg_run: tuple[str, str] = ffmpeg.run(merged_node, overwrite_output=True, quiet=True)
+        ffmpeg_run: tuple[str, str] = ffmpeg.run(merged_node, overwrite_output=True, quiet=True, cmd=ffmpeg_cmd)
         stdout, stderr = ffmpeg_run
         logger.warning(f"ffmpeg stdout:\n{stdout}")
         logger.warning(f"ffmpeg stderr:\n{stderr}")
@@ -107,7 +111,8 @@ def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, youtube_vi
     file_paths["video"] = download_info.file_path
     file_paths["thumbnail"] = youtube_util.download_thumbnail(youtube_vid, save_dir)
 
-    audio_paths = run_ffmpeg_for_video_to_m4a_and_mp3(file_paths["video"], file_paths["thumbnail"])
+    ffmpeg_cmd = self.config_obj.project.ssco.ffmpeg_cmd
+    audio_paths = run_ffmpeg_for_video_to_m4a_and_mp3(file_paths["video"], file_paths["thumbnail"], ffmpeg_cmd)
     file_paths |= audio_paths
     file_download_urls: dict[str, str] = {}
 

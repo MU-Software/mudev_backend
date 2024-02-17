@@ -8,6 +8,7 @@ import app.const.filepath as filepath_const
 
 class SSCoProjectSetting(pydantic_settings.BaseSettings):
     telegram_bot_token: pydantic.SecretStr
+    ffmpeg_cmd: str = "ffmpeg"
 
 
 class ProjectSetting(pydantic_settings.BaseSettings):
