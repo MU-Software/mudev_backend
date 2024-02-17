@@ -84,13 +84,13 @@ def run_ffmpeg_for_video_to_m4a_and_mp3(video_path: pt.Path, coverart_path: pt.P
     if docker_util.is_container():
         compiled_args: list[str] = ffmpeg.compile(merged_node, overwrite_output=True)
         stdout, stderr = docker_util.run_cmd_on_host(compiled_args)
-        logger.debug(f"ffmpeg stdout:\n{stdout}")
-        logger.debug(f"ffmpeg stderr:\n{stderr}")
+        logger.warning(f"ffmpeg stdout:\n{stdout}")
+        logger.warning(f"ffmpeg stderr:\n{stderr}")
     else:
         ffmpeg_run: tuple[str, str] = ffmpeg.run(merged_node, overwrite_output=True, quiet=True)
         stdout, stderr = ffmpeg_run
-        logger.debug(f"ffmpeg stdout:\n{stdout}")
-        logger.debug(f"ffmpeg stderr:\n{stderr}")
+        logger.warning(f"ffmpeg stdout:\n{stdout}")
+        logger.warning(f"ffmpeg stderr:\n{stderr}")
 
     return {ext: video_path.with_suffix(f".{ext}") for ext in ["mp3", "m4a"]}
 
