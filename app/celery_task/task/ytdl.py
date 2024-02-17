@@ -70,7 +70,7 @@ def run_ffmpeg_for_video_to_m4a_and_mp3(video_path: pt.Path, coverart_path: pt.P
     target_mp3_path = target_video_path.with_suffix(".mp3")
     target_m4a_path = target_video_path.with_suffix(".m4a")
 
-    original_file_node = ffmpeg.input(target_video_path)
+    original_file_node = ffmpeg.input(target_video_path.as_posix())
     audio_node = original_file_node.audio.filter("silenceremove", "1", "0", "-50dB").filter_multi_output("asplit")
     m4a_output_node = audio_node.stream(1).output(target_m4a_path.as_posix())
     mp3_output_node = (
