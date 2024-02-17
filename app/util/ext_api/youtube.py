@@ -3,12 +3,12 @@ from __future__ import annotations
 import base64
 import contextlib
 import functools
+import importlib.metadata
 import io
 import json
 import logging
 import pathlib as pt
 import re
-import sys
 import typing
 import zlib
 
@@ -16,12 +16,9 @@ import googleapiclient.discovery as google_api_discovery
 import PIL.Image
 import pydantic
 import requests
-
-import app.util.subprocess_util as sp_util
+import yt_dlp
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_YOUTUBE_DL_EXECUTABLE_INFO: list[str] = ["poetry", "run", sys.executable, "-m", "yt_dlp"]
 
 VIDEO_REGEX = re.compile(
     r"(?:youtube\.com|youtu\.be)/(?:[\w-]+\?v=|embed/|v/|shorts/)?([\w-]{11})", flags=re.IGNORECASE
@@ -92,79 +89,54 @@ def get_video_ids_from_playlist_id(playlist_id: str, google_api_key: str) -> set
     return video_ids
 
 
-def get_youtube_dl_version() -> str | None:
-    cmdline = [*DEFAULT_YOUTUBE_DL_EXECUTABLE_INFO, "--version"]
-    if (result := sp_util.run(cmdline, check=False)).returncode != 0:
-        return None
-    return result.stdout.strip()
+def get_youtube_dl_version() -> str:
+    return importlib.metadata.version(yt_dlp.__name__)
 
 
-def get_youtube_dl_video_info_cmdline(video_id: str) -> list[str]:
-    return [
-        *DEFAULT_YOUTUBE_DL_EXECUTABLE_INFO,
-        f"https://www.youtube.com/watch?v={video_id}",
-        "-o",
-        "%(title)s.%(ext)s",
-        "--windows-filenames",
-        "--extract-audio",
-        "--keep-video",
-        "--quiet",
-        "--simulate",
-        "--skip-download",
-        "--print",
-        "title",
-        "--print",
-        "format",
-    ]
-
-
-def get_youtube_dl_download_cmdline(video_id: str, save_dir: pt.Path, overwrite: bool = True) -> list[str]:
-    save_dir.mkdir(parents=True, exist_ok=True)
-    save_dir = save_dir.absolute()
-    return [
-        *DEFAULT_YOUTUBE_DL_EXECUTABLE_INFO,
-        f"https://www.youtube.com/watch?v={video_id}",
-        "--verbose",
-        "--dump-json",
-        "--no-simulate",
-        "--no-update",
-        "--no-abort-on-error",
-        "--no-continue",
-        "--windows-filenames",
-        "--postprocessor-args",
-        "ffmpeg_i1:-hwaccel=auto",
-        "--concat-playlist",
-        "never",
-        "-P",
-        save_dir.as_posix(),
-        "-o",
-        "%(title)s.%(ext)s",
-        "--force-overwrites" if overwrite else "--no-force-overwrites",
-        "--print",
-        "after_move:filepath",
-    ]
+def get_ytdlp_options(save_dir: pt.Path, overwrite: bool) -> dict[str, typing.Any]:
+    user_agent: str = (
+        "Mozilla/5.0 "
+        "(Macintosh; Intel Mac OS X 10_15_7)"
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/121.0.0.0 "
+        "Safari/537.36"
+    )
+    headers: dict[str, str] = {
+        "User-Agent": user_agent,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-us,en;q=0.5",
+        "Sec-Fetch-Mode": "navigate",
+    }
+    return {
+        "quiet": True,
+        "forcejson": True,
+        "simulate": False,
+        "outtmpl": {
+            "default": "%(title)s.%(ext)s",
+            "chapter": "%(title)s - %(section_number)03d %(section_title)s [%(id)s].%(ext)s",
+        },
+        "windowsfilenames": True,
+        "paths": {"home": save_dir.absolute().as_posix()},
+        "ignoreerrors": "only_download",
+        "overwrites": overwrite,
+        "continuedl": False,
+        "noprogress": True,
+        "noplaylist": True,
+        "verbose": True,
+        "keepvideo": True,
+        "postprocessor_args": {"ffmpeg_i1": ["-hwaccel=auto"]},
+        "compat_opts": set(),
+        "http_headers": headers,
+        "nooverwrites": False,
+        "forceprint": {},
+        "print_to_file": {},
+    }
 
 
 class YouTubeDLPVideoInfo(pydantic.BaseModel):
     video_id: str
-    stdout: str
-    stderr: str
-
-    @pydantic.computed_field  # type: ignore[misc]
-    @functools.cached_property
-    def title(self) -> str:
-        return self.stdout.splitlines()[0].strip()
-
-    @pydantic.computed_field  # type: ignore[misc]
-    @functools.cached_property
-    def quality(self) -> str:
-        return self.stdout.splitlines()[1].strip()
-
-    @pydantic.model_validator(mode="after")
-    def validate(self) -> typing.Self:
-        if not (self.title and self.quality):
-            raise ValueError("Invalid stdout")
-        return self
+    title: str
+    quality: str
 
 
 class YouTubeDLPDownloadResult(pydantic.BaseModel):
@@ -180,7 +152,7 @@ class YouTubeDLPDownloadResult(pydantic.BaseModel):
     @pydantic.computed_field  # type: ignore[misc]
     @functools.cached_property
     def file_path(self) -> pt.Path:
-        return pt.Path(self.stdout.splitlines()[1])
+        return pt.Path(self.data["filename"])
 
     @pydantic.computed_field  # type: ignore[misc]
     @functools.cached_property
@@ -205,36 +177,24 @@ class YouTubeDLPDownloadResult(pydantic.BaseModel):
 
 
 def get_video_info(video_id: str) -> YouTubeDLPVideoInfo:
-    cmdline = get_youtube_dl_video_info_cmdline(video_id)
-    try:
-        result = sp_util.run(cmdline, check=True)
-        return YouTubeDLPVideoInfo(video_id=video_id, stdout=result.stdout, stderr=result.stderr)
-    except Exception as e:
-        raise RuntimeError("youtube-dlp failed") from e
-
-
-async def async_get_video_info(video_id: str) -> YouTubeDLPVideoInfo:
-    cmdline = get_youtube_dl_video_info_cmdline(video_id)
-    try:
-        result = await sp_util.async_run(cmdline, check=True)
-        return YouTubeDLPVideoInfo(video_id=video_id, stdout=result.stdout, stderr=result.stderr)
-    except Exception as e:
-        raise RuntimeError("youtube-dlp failed") from e
+    with yt_dlp.YoutubeDL(get_ytdlp_options(save_dir=pt.Path.cwd(), overwrite=True) | {"simulate": True}) as ydl:
+        extracted_info: dict = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+        sanitized_info: dict = ydl.sanitize_info(extracted_info)
+        return YouTubeDLPVideoInfo(video_id=video_id, title=sanitized_info["title"], quality=sanitized_info["format"])
 
 
 def download_video(video_id: str, save_dir: pt.Path, overwrite: bool = True) -> YouTubeDLPDownloadResult:
-    cmdline = get_youtube_dl_download_cmdline(video_id, save_dir, overwrite)
-    try:
-        result = sp_util.run(cmdline, check=True)
-        return YouTubeDLPDownloadResult(video_id=video_id, stdout=result.stdout, stderr=result.stderr)
-    except Exception as e:
-        raise RuntimeError("youtube-dlp failed") from e
+    with (
+        io.StringIO() as stdout,
+        io.StringIO() as stderr,
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        with yt_dlp.YoutubeDL(get_ytdlp_options(save_dir=save_dir, overwrite=overwrite)) as ydl:
+            if ydl.download([f"https://www.youtube.com/watch?v={video_id}"]) == 0:
+                return YouTubeDLPDownloadResult(video_id=video_id, stdout=stdout.getvalue(), stderr=stderr.getvalue())
 
-
-async def async_download_video(video_id: str, save_dir: pt.Path, overwrite: bool = True) -> YouTubeDLPDownloadResult:
-    cmdline = get_youtube_dl_download_cmdline(video_id, save_dir, overwrite)
-    try:
-        result = await sp_util.async_run(cmdline, check=True)
-        return YouTubeDLPDownloadResult(video_id=video_id, stdout=result.stdout, stderr=result.stderr)
-    except Exception as e:
-        raise RuntimeError("youtube-dlp failed") from e
+            logger.error(f"youtube-dlp failed to download video: {video_id}")
+            logger.info(f"youtube-dlp stdout:\n{stdout.getvalue()}")
+            logger.info(f"youtube-dlp stderr:\n{stderr.getvalue()}")
+            raise RuntimeError("youtube-dlp failed")
