@@ -11,21 +11,21 @@ python = "^3.11"
 fastapi = "^0.109.0"
 pydantic = "^2.6.1"
 redis = {version = "^5.0.1", extras = ["hiredis"]}
-SQLAlchemy = {extras = ["greenlet"], version = "^2.0.25"}
+SQLAlchemy = {extras = ["greenlet"], version = "^2.0.27"}
 uvicorn = "^0.27.1"
 gunicorn = "^21.2.0"
 alembic = {extras = ["tz"], version = "^1.13.1"}
 python-dotenv = "^1.0.1"
 eventlet = "^0.34.3"
 celery = {extras = ["redis", "sqlalchemy", "tblib"], version = "^5.3.6"}
-gitpython = "^3.1.41"
+gitpython = "^3.1.42"
 aiohttp = "^3.9.3"
 yt-dlp = "^2023.12.30"
 pillow = "^10.2.0"
 mutagen = "^1.47.0"
-google-api-python-client = "^2.117.0"
+google-api-python-client = "^2.118.0"
 ffmpeg-python = "^0.2.0"
-pydantic-settings = "^2.1.0"
+pydantic-settings = "^2.2.0"
 passlib = "^1.7.4"
 argon2-cffi = "^23.1.0"
 psycopg = {extras = ["binary"], version = "^3.1.18"}
@@ -39,24 +39,24 @@ email-validator = "^2.1.0.post1"
 pyjwt = "^2.8.0"
 user-agents = "^2.2.0"
 typing-extensions = "^4.9.0"
-python-multipart = "^0.0.6"
+python-multipart = "^0.0.9"
 aiofiles = "^23.2.1"
 python-telegram-bot = "^20.8"
 paramiko = "^3.4.0"
 docker = "^7.0.0"
-sentry-sdk = {extras = ["celery", "fastapi", "sqlalchemy"], version = "^1.40.3"}
+sentry-sdk = {extras = ["celery", "fastapi", "sqlalchemy"], version = "^1.40.4"}
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.6.1"
 pylint = "^3.0.3"
 flake8 = "^7.0.0"
 mypy = "^1.8.0"
-black = "^23.12.1"
+black = "^24.2.0"
 bandit = "^1.7.7"
 isort = "^5.13.2"
 refurb = "^1.28.0"
 flake8-noqa = "^1.4.0"
-flake8-bugbear = "^23.12.2"
+flake8-bugbear = "^24.2.6"
 types-redis = "^4.6.0.20240106"
 
 [build-system]
