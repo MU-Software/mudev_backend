@@ -3,6 +3,7 @@ import itertools
 import json
 import logging
 import pathlib as pt
+import shlex
 import subprocess as sp  # nosec B404
 
 import docker
@@ -64,8 +65,8 @@ def run_cmd_on_host(cmd: list[str]) -> tuple[str, str]:
     paramiko_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # nosec B507
     paramiko_client.connect("host.docker.internal", username=username, pkey=pkey)
 
-    logger.warning(f"Running command on host: \n[{', '.join(cmd)}]")
-    ssh_stdin, ssh_stdout, ssh_stderr = paramiko_client.exec_command(" ".join(cmd))  # nosec B601
+    logger.warning(f"Running command on host: \n[{shlex.join(cmd)}]")
+    ssh_stdin, ssh_stdout, ssh_stderr = paramiko_client.exec_command(shlex.join(cmd))  # nosec B601
     ssh_stdin.close()
 
     stdout = "".join(ssh_stdout.readlines())
