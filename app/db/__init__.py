@@ -72,6 +72,7 @@ class SyncDB(DB, type_util.SyncConnectedResource):
         # Close DB engine and session pool.
         self.engine.dispose()
         self.engine = None
+        self.session_maker = None
 
     @contextlib.contextmanager
     def get_sync_session(self) -> typing.Generator[sa_orm.Session, None, None]:
@@ -109,6 +110,7 @@ class AsyncDB(DB, type_util.AsyncConnectedResource):
         # Close DB engine and session pool.
         await self.engine.dispose()
         self.engine = None
+        self.session_maker = None
 
     @contextlib.asynccontextmanager
     async def get_async_session(self) -> typing.AsyncGenerator[sa_ext_asyncio.AsyncSession, None]:
