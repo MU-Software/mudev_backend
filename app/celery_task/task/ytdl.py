@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import json
 import logging
 import pathlib as pt
@@ -153,4 +154,5 @@ def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, youtube_vi
         )
         for c in chat_ids
     ]
-    asyncio.get_event_loop().run_until_complete(asyncio.gather(*message_tasks))
+    with contextlib.suppress(Exception):
+        asyncio.get_event_loop().run_until_complete(asyncio.gather(*message_tasks))
