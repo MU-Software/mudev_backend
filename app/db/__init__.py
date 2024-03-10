@@ -58,8 +58,11 @@ class SyncDB(DB, type_util.SyncConnectedResource):
     def open(self) -> typing.Self:
         # Create DB engine and session pool.
         config = self.config_obj.sqlalchemy.to_sqlalchemy_config()
-        self.engine = sa.engine_from_config(configuration=config, prefix="")
-        self.session_maker = sa_orm.session.sessionmaker(self.engine, autoflush=False, expire_on_commit=False)
+
+        if not self.engine:
+            self.engine = sa.engine_from_config(configuration=config, prefix="")
+        if not self.session_maker:
+            self.session_maker = sa_orm.session.sessionmaker(self.engine, autoflush=False, expire_on_commit=False)
 
         with self.session_maker() as session:
             self.check_connection(session)
@@ -70,9 +73,11 @@ class SyncDB(DB, type_util.SyncConnectedResource):
 
     def close(self) -> None:
         # Close DB engine and session pool.
-        self.engine.dispose()
-        self.engine = None
-        self.session_maker = None
+        if self.session_maker:
+            self.session_maker = None
+        if self.engine:
+            self.engine.dispose()
+            self.engine = None
 
     @contextlib.contextmanager
     def get_sync_session(self) -> typing.Generator[sa_orm.Session, None, None]:
@@ -96,8 +101,10 @@ class AsyncDB(DB, type_util.AsyncConnectedResource):
     async def aopen(self) -> typing.Self:
         # Create DB engine and session pool.
         config = self.config_obj.sqlalchemy.to_sqlalchemy_config()
-        self.engine = sa_ext_asyncio.async_engine_from_config(configuration=config, prefix="")
-        self.session_maker = sa_ext_asyncio.async_sessionmaker(self.engine, autoflush=False, expire_on_commit=False)
+        if not self.engine:
+            self.engine = sa_ext_asyncio.async_engine_from_config(configuration=config, prefix="")
+        if not self.session_maker:
+            self.session_maker = sa_ext_asyncio.async_sessionmaker(self.engine, autoflush=False, expire_on_commit=False)
 
         async with self.session_maker() as session:
             await session.run_sync(self.check_connection)
@@ -108,9 +115,11 @@ class AsyncDB(DB, type_util.AsyncConnectedResource):
 
     async def aclose(self) -> None:
         # Close DB engine and session pool.
-        await self.engine.dispose()
-        self.engine = None
-        self.session_maker = None
+        if self.session_maker:
+            self.session_maker = None
+        if self.engine:
+            await self.engine.dispose()
+            self.engine = None
 
     @contextlib.asynccontextmanager
     async def get_async_session(self) -> typing.AsyncGenerator[sa_ext_asyncio.AsyncSession, None]:

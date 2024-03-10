@@ -230,3 +230,17 @@ def compare_user_agent(user_agent_a_str: str, user_agent_b_str: str) -> bool:
             user_agent_a.browser.family == user_agent_b.browser.family,
         )
     )
+
+
+T = typing.TypeVar("T", bound=enum.Enum)
+
+
+def get_enum_item(cls: type[T], value: str | T) -> T | None:
+    if isinstance(value, cls):
+        return value
+    if isinstance(value, str):
+        possible_keys: list[str] = [value, value.upper(), value.lower()]
+        for key in possible_keys:
+            if key in cls.__members__:
+                return cls.__members__[key]
+    return None
