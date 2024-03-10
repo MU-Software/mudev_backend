@@ -12,14 +12,12 @@ import sqlalchemy as sa
 import telegram
 
 import app.celery_task.__interface__ as celery_interface
-import app.const.celery as celery_const
 import app.const.sns as sns_const
 import app.crud.file as file_crud
 import app.crud.ssco as ssco_crud
 import app.crud.user as user_crud
 import app.db.model.file as file_model
 import app.db.model.ssco as ssco_model
-import app.db.model.task as task_model
 import app.schema.file as file_schema
 import app.schema.ssco as ssco_schema
 import app.util.ext_api.docker as docker_util
@@ -31,33 +29,6 @@ logger = logging.getLogger(__name__)
 class FileInfo(typing.TypedDict):
     path: pt.Path | None
     uuid: uuid.UUID | None
-
-
-def raise_if_task_not_runnable(task: celery_interface.SessionTask) -> None:
-    """
-    ytdl_updater task가 실행 중인지 확인 후,
-    updater가 실행 중이면 본 Task를 실패로 처리하고 5분 후에 다시 시도합니다.
-    """
-    retry_kwargs = {
-        "countdown": 5 * 60,
-        "max_retries": task.max_retries + 1 if task.max_retries is not None else 1,
-        "throw": True,
-    }
-    if not task.startable:
-        raise task.retry(**retry_kwargs, exc=RuntimeError("Task is not startable"))
-
-    import app.celery_task.task.ytdl_updater as ytdl_updater
-
-    ytdl_updater_task_name: str = ytdl_updater.ytdl_updater_task.name
-    stmt = sa.select(sa.exists(task_model.Task)).where(
-        task_model.Task.celery_task_name == ytdl_updater_task_name,
-        task_model.Task.startable.is_(True),
-        task_model.Task.state != celery_const.CeleryTaskStatus.SUCCESS,
-    )
-    with task.sync_db.get_sync_session() as session:
-        if bool(session.execute(stmt).scalar_one_or_none()):
-            task.update_task_row(startable=False)
-            raise task.retry(**retry_kwargs, exc=RuntimeError("Updater is running"))
 
 
 def run_ffmpeg_for_video_to_m4a_and_mp3(
@@ -102,8 +73,6 @@ def run_ffmpeg_for_video_to_m4a_and_mp3(
 @celery.shared_task(bind=True, base=celery_interface.SessionTask)
 def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, youtube_vid: str) -> None:
     """youtube-dl을 이용해 비디오를 다운로드하고, Video와 File row를 생성합니다."""
-    raise_if_task_not_runnable(self)
-
     save_dir = self.config_obj.project.upload_to.youtube_video_dir(youtube_vid)
     download_info = youtube_util.download_video(youtube_vid, save_dir)
 
