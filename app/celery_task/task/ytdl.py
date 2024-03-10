@@ -70,7 +70,12 @@ def run_ffmpeg_for_video_to_m4a_and_mp3(
     return {ext: video_path.with_suffix(f".{ext}") for ext in ["mp3", "m4a"]}
 
 
-@celery.shared_task(bind=True, base=celery_interface.SessionTask)
+@celery.shared_task(
+    bind=True,
+    base=celery_interface.SessionTask,
+    autoretry_for=(Exception,),
+    retry_kwargs={"max_retries": 3},
+)
 def ytdl_downloader_task(self: celery_interface.SessionTask[None], *, youtube_vid: str) -> None:
     """youtube-dl을 이용해 비디오를 다운로드하고, Video와 File row를 생성합니다."""
     save_dir = self.config_obj.project.upload_to.youtube_video_dir(youtube_vid)
