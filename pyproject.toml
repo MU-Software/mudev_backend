@@ -10,7 +10,7 @@ readme = "README.md"
 python = "^3.11"
 fastapi = "^0.109.0"
 pydantic = "^2.6.3"
-redis = {version = "^5.0.2", extras = ["hiredis"]}
+redis = {version = "^5.0.3", extras = ["hiredis"]}
 SQLAlchemy = {extras = ["greenlet"], version = "^2.0.28"}
 uvicorn = "^0.27.1"
 gunicorn = "^21.2.0"
