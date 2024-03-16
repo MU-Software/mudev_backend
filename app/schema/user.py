@@ -47,6 +47,8 @@ class UserDTO(pydantic.BaseModel):
 
 
 class UserSignInHistoryDTO(pydantic.BaseModel):
+    uuid: uuid.UUID
+
     ip: pydantic.IPvAnyAddress
     user_agent: str
 
