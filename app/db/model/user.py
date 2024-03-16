@@ -100,19 +100,19 @@ class User(db_mixin.DefaultModelMixin):
         self.signin_fail_count = 0
         self.signin_failed_at = None
         self.password = argon2.PasswordHasher().hash(password)
-        self.password_updated_at = sa.func.now()
+        self.password_updated_at = time_util.get_utcnow()
 
     def mark_as_signin_succeed(self) -> None:
         self.signin_fail_count = 0
         self.signin_failed_at = None
-        self.last_signin_at = sa.func.now()
+        self.last_signin_at = time_util.get_utcnow()
 
     def mark_as_signin_failed(self) -> None:
         self.signin_fail_count += 1
-        self.signin_failed_at = sa.func.now()
+        self.signin_failed_at = time_util.get_utcnow()
 
         if self.signin_fail_count >= ALLOWED_SIGNIN_FAILURES:
-            self.locked_at = sa.func.now()
+            self.locked_at = time_util.get_utcnow()
             self.locked_reason = SignInDisabledReason.TOO_MUCH_LOGIN_FAIL.value
 
 

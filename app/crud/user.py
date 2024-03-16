@@ -85,7 +85,7 @@ class UserSignInHistoryCRUD(
     ) -> None:
         if not (db_obj := await self.get_using_token_obj(session=session, token=token)):
             error_const.AuthNError.AUTH_HISTORY_NOT_FOUND().raise_()
-        db_obj.deleted_at = db_obj.expires_at = sa.func.now()
+        db_obj.deleted_at = db_obj.expires_at = time_util.get_utcnow()
         await session.commit()
 
         redis_key = redis_keytype.RedisKeyType.TOKEN_REVOKED.as_redis_key(str(token.user))

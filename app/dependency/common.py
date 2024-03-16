@@ -11,6 +11,7 @@ import app.config.fastapi as fastapi_config
 import app.db as db_module
 import app.db.model.user as user_model
 import app.redis as redis_module
+import app.util.time_util as time_util
 
 
 def fastapi_setting_di(request: fastapi.Request) -> typing.Generator[fastapi_config.FastAPISetting, None, None]:
@@ -45,7 +46,7 @@ async def get_system_user(db_session: dbDI, config_obj: settingDI) -> user_model
             username="system",
             password=argon2.PasswordHasher().hash(config_obj.secret_key.get_secret_value()),
             email="system@mudev.cc",
-            email_verified_at=sa.func.now(),
+            email_verified_at=time_util.get_utcnow(),
             nickname="system",
             private=True,
             birth=datetime.date.min,
